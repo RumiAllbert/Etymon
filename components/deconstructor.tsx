@@ -5,6 +5,7 @@ import {
   type Edge,
   Handle,
   type Node,
+  Panel,
   Position,
   ReactFlow,
   ReactFlowProvider,
@@ -451,7 +452,7 @@ const defaultDefinition: Definition = {
 
 function createInitialNodes(
   definition: Definition,
-  handleWordSubmit: (word: string) => void,
+  handleWordSubmit: (word: string) => Promise<void>,
   initialWord?: string
 ) {
   const initialNodes: Node[] = [];
@@ -562,12 +563,26 @@ const SimilarWordsPanel = ({
   onWordClick,
 }: {
   similarWords: Definition["similarWords"];
-  onWordClick: (word: string) => void;
+  onWordClick: (word: string) => Promise<void>;
 }) => {
   const [isLoading] = useAtom(isLoadingAtom);
+
+  const handleClick = async (word: string) => {
+    console.log("Similar word clicked:", word);
+    if (isLoading) {
+      console.log("Loading in progress, click ignored");
+      return;
+    }
+    try {
+      await onWordClick(word);
+    } catch (error) {
+      console.error("Error handling similar word click:", error);
+    }
+  };
+
   return (
     <div
-      className={`fixed right-8 top-8 w-80 dark:bg-gray-800/90 bg-white/90 backdrop-blur-sm dark:border-gray-700/50 border-gray-200/50 border rounded-xl p-6 transition-all duration-1000 ${
+      className={`w-full dark:bg-gray-800/90 bg-white/90 backdrop-blur-sm dark:border-gray-700/50 border-gray-200/50 border rounded-xl p-6 transition-all duration-1000 ${
         isLoading ? "opacity-0 blur-[20px]" : ""
       }`}
     >
@@ -576,8 +591,10 @@ const SimilarWordsPanel = ({
         {similarWords.map((word, i) => (
           <div key={i} className="space-y-1">
             <button
-              onClick={() => onWordClick(word.word)}
-              className="text-lg font-serif dark:text-blue-400 text-blue-600 hover:dark:text-blue-300 hover:text-blue-500 transition-colors text-left w-full"
+              type="button"
+              onClick={() => handleClick(word.word)}
+              disabled={isLoading}
+              className="text-lg font-serif dark:text-blue-400 text-blue-600 hover:dark:text-blue-300 hover:text-blue-500 transition-colors text-left w-full disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {word.word}
             </button>
@@ -675,26 +692,41 @@ function Deconstructor({ word }: { word?: string }) {
     });
   }, [nodes]);
 
-  console.log(nodes);
-
   return (
-    <ReactFlow
-      nodes={nodes}
-      edges={edges}
-      onNodesChange={onNodesChange}
-      onEdgesChange={onEdgesChange}
-      nodeTypes={nodeTypes}
-      className="bg-background"
-      proOptions={{ hideAttribution: true }}
-    >
-      <Background color="currentColor" className="opacity-5" />
+    <div className="h-full w-full md:block flex flex-col">
+      <div className="md:h-full h-[80vh]">
+        <ReactFlow
+          nodes={nodes}
+          edges={edges}
+          onNodesChange={onNodesChange}
+          onEdgesChange={onEdgesChange}
+          nodeTypes={nodeTypes}
+          className="bg-background"
+          proOptions={{ hideAttribution: true }}
+        >
+          <Background color="currentColor" className="opacity-5" />
+          {definition.similarWords && (
+            <Panel
+              position="top-right"
+              className="pointer-events-auto md:block hidden"
+            >
+              <SimilarWordsPanel
+                similarWords={definition.similarWords}
+                onWordClick={handleWordSubmit}
+              />
+            </Panel>
+          )}
+        </ReactFlow>
+      </div>
       {definition.similarWords && (
-        <SimilarWordsPanel
-          similarWords={definition.similarWords}
-          onWordClick={handleWordSubmit}
-        />
+        <div className="md:hidden w-full px-4 pb-8">
+          <SimilarWordsPanel
+            similarWords={definition.similarWords}
+            onWordClick={handleWordSubmit}
+          />
+        </div>
       )}
-    </ReactFlow>
+    </div>
   );
 }
 
@@ -708,11 +740,9 @@ export default function WordDeconstructor({ word }: { word?: string }) {
         { "--loading-state": isLoading ? "1" : "0" } as React.CSSProperties
       }
     >
-      <div className="h-full w-full">
-        <ReactFlowProvider>
-          <Deconstructor word={word} />
-        </ReactFlowProvider>
-      </div>
+      <ReactFlowProvider>
+        <Deconstructor word={word} />
+      </ReactFlowProvider>
     </div>
   );
 }
