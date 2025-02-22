@@ -1,45 +1,47 @@
-import type { Metadata } from "next";
-import { Noto_Serif } from "next/font/google";
-import { Toaster } from "@/components/ui/sonner";
-import "./globals.css";
-import PlausibleProvider from "next-plausible";
 import Outbound from "@/components/outbound";
+import { ThemeProvider } from "@/components/theme-provider";
+import ThemeToggle from "@/components/theme-toggle";
+import { Toaster } from "@/components/ui/sonner";
+import type { Metadata } from "next";
+import PlausibleProvider from "next-plausible";
+import { Noto_Serif } from "next/font/google";
+import "./globals.css";
 
 const notoSerif = Noto_Serif({
   subsets: ["latin"],
 });
 
 export const metadata: Metadata = {
-  title: "deconstructor.",
-  description: "truly understand language.",
+  title: "Etymon",
+  description: "Understand the origins of words",
   openGraph: {
-    title: "deconstructor.",
-    siteName: "deconstructor.",
-    description: "truly understand language.",
+    title: "Etymon",
+    siteName: "Etymon",
+    description: "Understand the origins of words",
     images: "/og.png",
   },
 };
 
 export default function RootLayout({
   children,
-}: Readonly<{
+}: {
   children: React.ReactNode;
-}>) {
+}) {
   return (
-    <html lang="en">
-      <head>
-        <PlausibleProvider
-          domain="deconstructor.ayush.digital"
-          customDomain="https://a.ayush.digital"
-          trackOutboundLinks
-          selfHosted
-          taggedEvents
-        />
-      </head>
-      <body className={`${notoSerif.className} antialiased dark`}>
-        <Outbound />
-        {children}
-        <Toaster />
+    <html lang="en" suppressHydrationWarning>
+      <body className={notoSerif.className} suppressHydrationWarning>
+        <ThemeProvider attribute="class" defaultTheme="dark">
+          <PlausibleProvider domain="etymon.rumiallbert.com">
+            <div className="flex justify-between items-center absolute top-5 left-5 z-50 gap-4">
+              <Outbound />
+            </div>
+            <div className="absolute top-5 right-5 z-50">
+              <ThemeToggle />
+            </div>
+            {children}
+            <Toaster />
+          </PlausibleProvider>
+        </ThemeProvider>
       </body>
     </html>
   );

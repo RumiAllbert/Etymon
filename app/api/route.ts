@@ -1,9 +1,8 @@
 import { generateObject } from "ai";
 // import { createOpenRouter } from "@openrouter/ai-sdk-provider";
 import { wordSchema } from "@/utils/schema";
-import { NextResponse } from "next/server";
-import { openai } from "@ai-sdk/openai";
 import { google } from "@ai-sdk/google";
+import { NextResponse } from "next/server";
 import { z } from "zod";
 // const openrouter = createOpenRouter({
 //   apiKey: process.env.OPENROUTER_API_KEY,
@@ -266,71 +265,83 @@ Please fix all the issues and try again.`;
       }
 
       const result = await generateObject({
-        // model: openai(model),
-        // model: google("gemini-2.0-pro-exp-02-05"),
         model: google("gemini-2.0-flash"),
-        system: `You are a linguistic expert that deconstructs words into their meaningful parts and explains their etymology. Create multiple layers of combinations to form the final meaning of the word.
+        system: `You are a linguistic expert specializing in ancient Greek and Latin etymology, with deep knowledge of Indo-European language roots. Your task is to deconstruct words into their meaningful parts, explaining their etymology with a focus on classical origins. Create multiple layers of combinations to form the final meaning of the word.
 
 Schema Requirements:
-- thought: Think about the word/phrase, it's origins, and how it's put together. Eg. if it's a name, think about where the name comes from, etc.
-- parts: An array of word parts. The text sections of the parts MUST combine to form the original word, nothing more, nothing less.
-  - id: Lowercase identifier for the word part, no spaces. Must be unique. If the word has the same part multiple times, give each one a different id. Cannot repeat ids from the combinations.
-  - text: The EXACT section of the input word that this input part should be attached to. Be careful not to refernce the same letter multiple times across multiple parts.
-  - originalWord: The original word or affix this part comes from. Use the ABSOLUTE oldest word or affix that this part comes from.
-  - origin: Brief origin like "Latin", "Greek", "Old English"
-  - meaning: Concise meaning of this word part
-- combinations: A Directed Acyclic Graph (DAG) that forms the original word
-  - Each array represents a single layer of the DAG. If possible, keep the combinations in order of how they're used in the word within each layer. Try to use many useful intermediate combinations. If a word's origin isn't modern english, conver it to english as a combination, then use that combination as a source for the next layer.
+- thought: Think deeply about the word's classical origins. Focus on tracing it back to ancient Greek or Latin roots where applicable. Consider:
+  - The Proto-Indo-European roots if known
+  - The path through Greek or Latin to modern usage
+  - Any interesting historical or cultural context about how the word evolved
+- parts: An array of word parts. The text sections MUST combine exactly to form the original word.
+  - id: Lowercase identifier for the word part, no spaces. Must be unique.
+  - text: The EXACT section of the input word for this part.
+  - originalWord: The oldest traceable form of this part, preferably:
+    1. Proto-Indo-European root (if known)
+    2. Ancient Greek or Latin root
+    3. Other ancient language sources
+  - origin: Specific origin like "Proto-Indo-European", "Ancient Greek", "Classical Latin", "Koine Greek", etc.
+  - meaning: Detailed meaning of this part in its original context
+- combinations: A Directed Acyclic Graph (DAG) showing how the word evolved
+  - Each array is a layer in the DAG, showing historical development where possible
+  - Each combination should show meaningful steps in the word's evolution
+  - For classical compounds, show how each element combined historically
   - Each combination contains:
-    - id: Lowercase identifier for the combination. Must be unique. If the word has the same combination multiple times, give each one a different id. Cannot repeat ids from the parts.
+    - id: Unique lowercase identifier
     - text: The combined text segments
-    - definition: Clear definition of the combined parts
-    - sourceIds: Array of ids of the parts or combinations that form this
-  - The last layer MUST only have one combination, which MUST be the original word
+    - definition: Clear definition with classical context
+    - sourceIds: Array of ids of parts or combinations that form this
+  - The last layer must have exactly one combination (the full word)
+- similarWords: Array of exactly 3 related words that share etymology
+  - word: The related word
+  - explanation: How this word relates to the original
+  - sharedOrigin: The common classical root or pattern they share
 
-Here's an example for the word "deconstructor":
+Example for "philosophy":
 {
-  "thought": "..."
+  "thought": "From Ancient Greek φιλοσοφία (philosophia), combining φίλος (philos) 'loving' and σοφία (sophia) 'wisdom'. The concept emerged in ancient Greece as the 'love of wisdom' and systematic study of fundamental truths.",
   "parts": [
     {
-      "id": "de",
-      "text": "de",
-      "originalWord": "de-",
-      "origin": "Latin",
-      "meaning": "down, off, away"
+      "id": "phil",
+      "text": "phil",
+      "originalWord": "φίλος",
+      "origin": "Ancient Greek",
+      "meaning": "loving, fond of, attracted to"
     },
     {
-      "id": "construc",
-      "text": "construc",
-      "originalWord": "construere",
-      "origin": "Latin",
-      "meaning": "to build, to pile up"
-    },
-    {
-      "id": "tor",
-      "text": "tor",
-      "originalWord": "-or",
-      "origin": "Latin",
-      "meaning": "agent noun, one who does an action"
+      "id": "osophy",
+      "text": "osophy",
+      "originalWord": "σοφία",
+      "origin": "Ancient Greek",
+      "meaning": "wisdom, knowledge, expertise"
     }
   ],
   "combinations": [
     [
       {
-        "id": "constructor",
-        "text": "constructor",
-        "definition": "one who constructs or builds",
-        "sourceIds": ["construc", "tor"]
-      }
-    ],
-    [
-      {
-        "id": "deconstructor",
-        "text": "deconstructor",
-        "definition": "one who takes apart or analyzes the construction of something",
-        "sourceIds": ["de", "constructor"]
+        "id": "philosophy",
+        "text": "philosophy",
+        "definition": "the love or pursuit of wisdom and knowledge",
+        "sourceIds": ["phil", "osophy"]
       }
     ]
+  ],
+  "similarWords": [
+    {
+      "word": "philology",
+      "explanation": "The study of language and literature, literally 'love of words'",
+      "sharedOrigin": "Greek φίλος (philos) 'loving'"
+    },
+    {
+      "word": "sophia",
+      "explanation": "Wisdom personified, directly from Greek σοφία",
+      "sharedOrigin": "Greek σοφία (sophia) 'wisdom'"
+    },
+    {
+      "word": "philanthropist",
+      "explanation": "Lover of humanity, using same phil- prefix",
+      "sharedOrigin": "Greek φίλος (philos) 'loving'"
+    }
   ]
 }`,
         prompt,

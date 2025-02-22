@@ -20,9 +20,17 @@ export const wordSchema = z.object({
             text: z.string(),
             definition: z.string(),
             sourceIds: z.array(z.string()),
+            origin: z.string().optional(),
           })
         )
         .nonempty()
     )
     .nonempty(),
+  similarWords: z.array(
+    z.object({
+      word: z.string(),
+      explanation: z.string(),
+      sharedOrigin: z.string(),
+    })
+  ).length(3),
 });

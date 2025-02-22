@@ -1,25 +1,25 @@
 "use client";
+import { wordSchema } from "@/utils/schema";
 import {
-  ReactFlow,
   Background,
   type Edge,
   Handle,
   type Node,
   Position,
+  ReactFlow,
   ReactFlowProvider,
-  useReactFlow,
+  useEdgesState,
   useNodesInitialized,
   useNodesState,
-  useEdgesState,
+  useReactFlow,
 } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
-import { useEffect, useState, useMemo } from "react";
-import { wordSchema } from "@/utils/schema";
-import { z } from "zod";
 import { atom, useAtom } from "jotai";
-import Spinner from "./spinner";
-import { toast } from "sonner";
 import { usePlausible } from "next-plausible";
+import { useEffect, useMemo, useState } from "react";
+import { toast } from "sonner";
+import { z } from "zod";
+import Spinner from "./spinner";
 
 const isLoadingAtom = atom(false);
 
@@ -38,11 +38,24 @@ const WordChunkNode = ({ data }: { data: { text: string } }) => {
         isLoading ? "opacity-0 blur-[20px]" : ""
       }`}
     >
-      <div className="text-5xl font-serif mb-1">{data.text}</div>
-      <div className="w-full h-3 border border-t-0 border-white" />
+      <div className="text-5xl font-serif mb-1 dark:text-gray-100 text-gray-900">
+        {data.text}
+      </div>
+      <div className="w-full h-3 border border-t-0 dark:border-gray-700 border-gray-200" />
       <Handle type="source" position={Position.Bottom} style={{ opacity: 0 }} />
     </div>
   );
+};
+
+const getOriginColor = (origin: string) => {
+  const lowerOrigin = origin.toLowerCase();
+  if (lowerOrigin.includes("greek")) {
+    return "dark:bg-green-500/20 bg-green-500/10 dark:text-green-300 text-green-600";
+  }
+  if (lowerOrigin.includes("latin")) {
+    return "dark:bg-red-500/20 bg-red-500/10 dark:text-red-300 text-red-600";
+  }
+  return "dark:bg-gray-500/20 bg-gray-500/10 dark:text-gray-300 text-gray-600";
 };
 
 const OriginNode = ({
@@ -51,19 +64,27 @@ const OriginNode = ({
   data: { originalWord: string; origin: string; meaning: string };
 }) => {
   const [isLoading] = useAtom(isLoadingAtom);
+  const colorClass = getOriginColor(data.origin);
+
   return (
     <div
       className={`flex flex-col items-stretch transition-all duration-1000 ${
         isLoading ? "opacity-0 blur-[20px]" : ""
       }`}
     >
-      <div className="px-4 py-2 rounded-lg bg-gray-800 border border-gray-700/50 min-w-fit max-w-[180px]">
+      <div className="px-4 py-2 rounded-lg dark:bg-gray-800 bg-white dark:border-gray-700/50 border-gray-200/50 border min-w-fit max-w-[180px]">
         <div className="flex flex-col items-start">
-          <p className="text-lg font-serif mb-1 whitespace-nowrap">
+          <p className="text-lg font-serif mb-1 whitespace-nowrap dark:text-gray-100 text-gray-900">
             {data.originalWord}
           </p>
-          <p className="text-xs text-gray-400 w-full">{data.origin}</p>
-          <p className="text-xs text-gray-300 w-full">{data.meaning}</p>
+          <span
+            className={`px-2 py-0.5 text-xs font-medium rounded-full ${colorClass}`}
+          >
+            {data.origin}
+          </span>
+          <p className="text-xs dark:text-gray-300 text-gray-700 w-full mt-1">
+            {data.meaning}
+          </p>
         </div>
       </div>
       <Handle type="target" position={Position.Top} style={{ opacity: 0 }} />
@@ -75,27 +96,96 @@ const OriginNode = ({
 const CombinedNode = ({
   data,
 }: {
-  data: { text: string; definition: string };
+  data: { text: string; definition: string; origin?: string };
 }) => {
   const [isLoading] = useAtom(isLoadingAtom);
+  const colorClass = data.origin ? getOriginColor(data.origin) : "";
+
   return (
     <div
       className={`flex flex-col items-stretch transition-all duration-1000 ${
         isLoading ? "opacity-0 blur-[20px]" : ""
       }`}
     >
-      <div className="px-4 py-2 rounded-lg bg-gray-800 border border-gray-700/50 min-w-fit max-w-[250px]">
+      <div className="px-4 py-2 rounded-lg dark:bg-gray-800 bg-white dark:border-gray-700/50 border-gray-200/50 border min-w-fit max-w-[250px]">
         <div className="flex flex-col items-start">
-          <p className="text-xl font-serif mb-1 whitespace-nowrap">
+          <p className="text-xl font-serif mb-1 whitespace-nowrap dark:text-gray-100 text-gray-900">
             {data.text}
           </p>
-          <p className="text-sm text-gray-300 w-full">{data.definition}</p>
+          {data.origin && (
+            <span
+              className={`px-2 py-0.5 text-xs font-medium rounded-full ${colorClass} mb-1`}
+            >
+              {data.origin}
+            </span>
+          )}
+          <p className="text-sm dark:text-gray-300 text-gray-700 w-full">
+            {data.definition}
+          </p>
         </div>
       </div>
       <Handle type="target" position={Position.Top} style={{ opacity: 0 }} />
       <Handle type="source" position={Position.Bottom} style={{ opacity: 0 }} />
     </div>
   );
+};
+
+const useTypingAnimation = (
+  words: string[],
+  typingSpeed = 150,
+  deletingSpeed = 100,
+  pauseDuration = 2000
+) => {
+  const [placeholder, setPlaceholder] = useState("");
+  const [wordIndex, setWordIndex] = useState(0);
+  const [isTyping, setIsTyping] = useState(true);
+  const [isPaused, setIsPaused] = useState(false);
+
+  useEffect(() => {
+    let timeout: NodeJS.Timeout;
+
+    const animateTyping = () => {
+      const currentWord = words[wordIndex];
+
+      if (isTyping) {
+        if (placeholder.length < currentWord.length) {
+          timeout = setTimeout(() => {
+            setPlaceholder(currentWord.slice(0, placeholder.length + 1));
+          }, typingSpeed);
+        } else {
+          setIsPaused(true);
+          timeout = setTimeout(() => {
+            setIsPaused(false);
+            setIsTyping(false);
+          }, pauseDuration);
+        }
+      } else {
+        if (placeholder.length > 0) {
+          timeout = setTimeout(() => {
+            setPlaceholder(placeholder.slice(0, -1));
+          }, deletingSpeed);
+        } else {
+          setIsTyping(true);
+          setWordIndex((prev) => (prev + 1) % words.length);
+        }
+      }
+    };
+
+    timeout = setTimeout(animateTyping, isPaused ? pauseDuration : 0);
+
+    return () => clearTimeout(timeout);
+  }, [
+    placeholder,
+    wordIndex,
+    isTyping,
+    isPaused,
+    words,
+    typingSpeed,
+    deletingSpeed,
+    pauseDuration,
+  ]);
+
+  return placeholder;
 };
 
 const InputNode = ({
@@ -105,6 +195,25 @@ const InputNode = ({
 }) => {
   const [word, setWord] = useState(data.initialWord || "");
   const [isLoading, setIsLoading] = useAtom(isLoadingAtom);
+  const placeholder = useTypingAnimation(
+    [
+      "Enter a word",
+      "Φιλοσοφία", // Greek: "philosophy"
+      "Generare", // Latin: "to generate"
+      "Bibliotheca", // Latin: "library"
+      "Democracy", // English
+      "Metamorphosis", // English from Greek
+      "Esperanza", // Spanish: "hope"
+      "Mariposa", // Spanish: "butterfly"
+      "Ἀλήθεια", // Greek: "truth"
+      "Felicitas", // Latin: "happiness"
+      "Synchronicity", // English from Greek
+      "Libertad", // Spanish: "freedom"
+    ],
+    100, // typing speed
+    50, // deleting speed
+    2000 // pause duration
+  );
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -120,29 +229,38 @@ const InputNode = ({
   };
 
   return (
-    <form
-      className="px-6 py-4 rounded-xl bg-gray-800/80 border border-gray-700/50 shadow-xl flex gap-3"
-      onSubmit={handleSubmit}
-    >
-      <input
-        type="text"
-        value={word}
-        onChange={(e) => setWord(e.target.value)}
-        placeholder="Enter a word..."
-        className="flex-1 px-3 py-2 rounded-lg bg-gray-900/50 border border-gray-700/50 text-gray-100 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500/50"
-        disabled={isLoading}
-      />
-      <button
-        type="submit"
-        disabled={isLoading}
-        className={`w-[100px] px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-medium disabled:opacity-50 transition-colors flex items-center justify-center ${
-          isLoading ? "cursor-not-allowed" : ""
-        }`}
+    <div className="flex flex-col items-center gap-4">
+      <div className="flex items-center gap-2">
+        <h1 className="text-4xl font-serif dark:text-gray-100 text-gray-900">
+          Etymon
+        </h1>
+        <span className="px-2 py-0.5 text-xs font-medium dark:bg-blue-500/20 bg-blue-500/10 dark:text-blue-300 text-blue-600 rounded-full">
+          beta
+        </span>
+      </div>
+      <form
+        className="px-6 py-4 rounded-xl dark:bg-gray-800/80 bg-white/80 dark:border-gray-700/50 border-gray-200/50 border shadow-xl flex gap-3"
+        onSubmit={handleSubmit}
       >
-        {isLoading ? <Spinner /> : "Analyze"}
-      </button>
-      {/* <Handle type="source" position={Position.Bottom} style={{ opacity: 0 }} /> */}
-    </form>
+        <input
+          type="text"
+          value={word}
+          onChange={(e) => setWord(e.target.value)}
+          placeholder={placeholder}
+          className="flex-1 px-3 py-2 rounded-lg dark:bg-gray-900/50 bg-gray-50/50 dark:border-gray-700/50 border-gray-200/50 border dark:text-gray-100 text-gray-900 dark:placeholder-gray-500 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500/50"
+          disabled={isLoading}
+        />
+        <button
+          type="submit"
+          disabled={isLoading}
+          className={`w-[120px] px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-medium disabled:opacity-50 transition-colors flex items-center justify-center ${
+            isLoading ? "cursor-not-allowed" : ""
+          }`}
+        >
+          {isLoading ? <Spinner /> : "Etymologize"}
+        </button>
+      </form>
+    </div>
   );
 };
 
@@ -283,48 +401,51 @@ function getLayoutedElements(nodes: Node[], edges: Edge[]) {
 type Definition = z.infer<typeof wordSchema>;
 
 const defaultDefinition: Definition = {
-  thought: "",
+  thought:
+    "From Ancient Greek Φιλοσοφία (philosophia), combining φίλος (philos) 'loving' and σοφία (sophia) 'wisdom'. The concept emerged in ancient Greece as the 'love of wisdom' and systematic study of fundamental truths.",
   parts: [
     {
-      id: "de",
-      text: "de",
-      originalWord: "de-",
-      origin: "Latin",
-      meaning: "down, off, away",
+      id: "phil",
+      text: "Φιλο",
+      originalWord: "φίλος",
+      origin: "Ancient Greek",
+      meaning: "loving, fond of, attracted to",
     },
     {
-      id: "construc",
-      text: "construc",
-      originalWord: "construere",
-      origin: "Latin",
-      meaning: "to build, to pile up",
-    },
-    {
-      id: "tor",
-      text: "tor",
-      originalWord: "-or",
-      origin: "Latin",
-      meaning: "agent noun, one who does an action",
+      id: "sophia",
+      text: "σοφία",
+      originalWord: "σοφία",
+      origin: "Ancient Greek",
+      meaning: "wisdom, knowledge, expertise",
     },
   ],
   combinations: [
     [
       {
-        id: "constructor",
-        text: "constructor",
-        definition: "one who constructs or builds",
-        sourceIds: ["construc", "tor"],
+        id: "philosophia",
+        text: "Φιλοσοφία",
+        definition: "the love or pursuit of wisdom and knowledge",
+        sourceIds: ["phil", "sophia"],
       },
     ],
-    [
-      {
-        id: "deconstructor",
-        text: "deconstructor",
-        definition:
-          "one who takes apart or analyzes the construction of something",
-        sourceIds: ["de", "constructor"],
-      },
-    ],
+  ],
+  similarWords: [
+    {
+      word: "φιλολογία",
+      explanation:
+        "The study of language and literature, literally 'love of words'",
+      sharedOrigin: "Greek φίλος (philos) 'loving'",
+    },
+    {
+      word: "σοφία",
+      explanation: "Wisdom personified, directly from Greek σοφία",
+      sharedOrigin: "Greek σοφία (sophia) 'wisdom'",
+    },
+    {
+      word: "φιλάνθρωπος",
+      explanation: "Lover of humanity, using same phil- prefix",
+      sharedOrigin: "Greek φίλος (philos) 'loving'",
+    },
   ],
 };
 
@@ -382,6 +503,20 @@ function createInitialNodes(
     const y = (layerIndex + 2) * verticalSpacing; // +2 to leave space for word chunks and origins
 
     layer.forEach((combination) => {
+      // Determine the origin based on source parts
+      const sourceOrigins = combination.sourceIds
+        .map((id) => {
+          const part = definition.parts.find((p) => p.id === id);
+          if (part) return part.origin;
+          const prevCombo = definition.combinations
+            .flat()
+            .find((c) => c.id === id);
+          return prevCombo?.origin;
+        })
+        .filter(Boolean);
+
+      const mainOrigin = sourceOrigins[0] || "";
+
       // Add combination node
       initialNodes.push({
         id: combination.id,
@@ -390,6 +525,7 @@ function createInitialNodes(
         data: {
           text: combination.text,
           definition: combination.definition,
+          origin: mainOrigin,
         },
       });
 
@@ -421,14 +557,52 @@ const nodeTypes = {
   inputNode: InputNode,
 };
 
+const SimilarWordsPanel = ({
+  similarWords,
+  onWordClick,
+}: {
+  similarWords: Definition["similarWords"];
+  onWordClick: (word: string) => void;
+}) => {
+  const [isLoading] = useAtom(isLoadingAtom);
+  return (
+    <div
+      className={`fixed right-8 top-8 w-80 dark:bg-gray-800/90 bg-white/90 backdrop-blur-sm dark:border-gray-700/50 border-gray-200/50 border rounded-xl p-6 transition-all duration-1000 ${
+        isLoading ? "opacity-0 blur-[20px]" : ""
+      }`}
+    >
+      <h2 className="text-xl font-serif mb-4">Similar Words</h2>
+      <div className="space-y-4">
+        {similarWords.map((word, i) => (
+          <div key={i} className="space-y-1">
+            <button
+              onClick={() => onWordClick(word.word)}
+              className="text-lg font-serif dark:text-blue-400 text-blue-600 hover:dark:text-blue-300 hover:text-blue-500 transition-colors text-left w-full"
+            >
+              {word.word}
+            </button>
+            <p className="text-sm dark:text-gray-300 text-gray-700">
+              {word.explanation}
+            </p>
+            <p className="text-xs dark:text-gray-400 text-gray-500">
+              From {word.sharedOrigin}
+            </p>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+};
+
 function Deconstructor({ word }: { word?: string }) {
   const [isLoading, setIsLoading] = useAtom(isLoadingAtom);
-
   const [definition, setDefinition] = useState<Definition>(defaultDefinition);
   const plausible = usePlausible();
+
   const handleWordSubmit = async (word: string) => {
     console.log("handleWordSubmit", word);
     try {
+      setIsLoading(true);
       const data = await fetch("/api", {
         method: "POST",
         body: JSON.stringify({ word }),
@@ -457,20 +631,16 @@ function Deconstructor({ word }: { word?: string }) {
           word,
         },
       });
-      // console.error("Error fetching definition", error);
       toast.error("The AI doesn't like that one! Try a different word.");
+    } finally {
+      setIsLoading(false);
     }
   };
 
   useEffect(() => {
-    async function fetchDefinition() {
-      if (word) {
-        setIsLoading(true);
-        await handleWordSubmit(word);
-        setIsLoading(false);
-      }
+    if (word) {
+      handleWordSubmit(word);
     }
-    fetchDefinition();
   }, [word]);
 
   const { initialNodes, initialEdges } = useMemo(
@@ -514,10 +684,16 @@ function Deconstructor({ word }: { word?: string }) {
       onNodesChange={onNodesChange}
       onEdgesChange={onEdgesChange}
       nodeTypes={nodeTypes}
-      className="bg-gray-900"
+      className="bg-background"
       proOptions={{ hideAttribution: true }}
     >
-      <Background color="#333" />
+      <Background color="currentColor" className="opacity-5" />
+      {definition.similarWords && (
+        <SimilarWordsPanel
+          similarWords={definition.similarWords}
+          onWordClick={handleWordSubmit}
+        />
+      )}
     </ReactFlow>
   );
 }
@@ -527,7 +703,7 @@ export default function WordDeconstructor({ word }: { word?: string }) {
 
   return (
     <div
-      className="h-screen bg-gray-900 text-gray-100"
+      className="h-screen dark:bg-gray-900 bg-white dark:text-gray-100 text-gray-900"
       style={
         { "--loading-state": isLoading ? "1" : "0" } as React.CSSProperties
       }
