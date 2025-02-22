@@ -14,6 +14,9 @@ const notoSerif = Noto_Serif({
 export const metadata: Metadata = {
   title: "Etymon.ai",
   description: "Understand the origins of words",
+  icons: {
+    icon: "/favicon.png",
+  },
   openGraph: {
     title: "Etymon.ai",
     siteName: "Etymon.ai",
