@@ -12,11 +12,11 @@ const notoSerif = Noto_Serif({
 });
 
 export const metadata: Metadata = {
-  title: "Etymon",
+  title: "Etymon.ai",
   description: "Understand the origins of words",
   openGraph: {
-    title: "Etymon",
-    siteName: "Etymon",
+    title: "Etymon.ai",
+    siteName: "Etymon.ai",
     description: "Understand the origins of words",
     images: "/og.png",
   },
