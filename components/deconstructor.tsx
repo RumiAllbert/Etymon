@@ -599,9 +599,11 @@ const SimilarWordsPanel = ({
       return;
     }
     try {
+      setShowSimilar(false); // Hide the panel when clicking a word
       await onWordClick(word);
     } catch (error) {
       console.error("Error handling similar word click:", error);
+      toast.error("Failed to look up similar word. Please try again.");
     }
   };
 
@@ -666,11 +668,19 @@ function Deconstructor({ word }: { word?: string }) {
 
   const handleWordSubmit = async (word: string) => {
     console.log("handleWordSubmit", word);
+    if (!word.trim()) {
+      toast.error("Please enter a word");
+      return;
+    }
+
     try {
       setIsLoading(true);
       const data = await fetch("/api", {
         method: "POST",
         body: JSON.stringify({ word }),
+        headers: {
+          "Content-Type": "application/json",
+        },
       });
 
       if (data.status === 203) {
