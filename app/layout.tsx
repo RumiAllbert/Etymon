@@ -30,7 +30,12 @@ export default function RootLayout({
   return (
     <html lang="en" suppressHydrationWarning>
       <body className={notoSerif.className} suppressHydrationWarning>
-        <ThemeProvider attribute="class" defaultTheme="dark">
+        <ThemeProvider
+          attribute="class"
+          defaultTheme="dark"
+          enableSystem
+          disableTransitionOnChange
+        >
           <PlausibleProvider domain="etymon.rumiallbert.com">
             <div className="flex justify-between items-center absolute top-5 left-5 z-50 gap-4">
               <Outbound />
