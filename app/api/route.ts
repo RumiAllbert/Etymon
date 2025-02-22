@@ -12,7 +12,7 @@ import { z } from "zod";
 
 type WordOutput = z.infer<typeof wordSchema>;
 
-export const maxDuration = 60;
+export const maxDuration = 30;
 
 function validateWordParts(word: string, parts: WordOutput["parts"]): string[] {
   const errors: string[] = [];
@@ -224,7 +224,7 @@ export async function POST(req: Request) {
 
     if (!word || typeof word !== "string") {
       return NextResponse.json(
-        { error: "Word is required and must be a string" },
+        { error: "Please enter a word" },
         { status: 400 }
       );
     }
@@ -264,108 +264,40 @@ Please fix all the issues and try again.`;
           break;
       }
 
-      const result = await generateObject({
-        model: google("gemini-2.0-flash"),
-        system: `You are a linguistic expert specializing in ancient Greek and Latin etymology, with deep knowledge of Indo-European language roots. Your task is to deconstruct words into their meaningful parts, explaining their etymology with a focus on classical origins. Create multiple layers of combinations to form the final meaning of the word.
-
-Schema Requirements:
-- thought: Think deeply about the word's classical origins. Focus on tracing it back to ancient Greek or Latin roots where applicable. Consider:
-  - The Proto-Indo-European roots if known
-  - The path through Greek or Latin to modern usage
-  - Any interesting historical or cultural context about how the word evolved
-- parts: An array of word parts. The text sections MUST combine exactly to form the original word.
-  - id: Lowercase identifier for the word part, no spaces. Must be unique.
-  - text: The EXACT section of the input word for this part.
-  - originalWord: The oldest traceable form of this part, preferably:
-    1. Proto-Indo-European root (if known)
-    2. Ancient Greek or Latin root
-    3. Other ancient language sources
-  - origin: Specific origin like "Proto-Indo-European", "Ancient Greek", "Classical Latin", "Koine Greek", etc.
-  - meaning: Detailed meaning of this part in its original context
-- combinations: A Directed Acyclic Graph (DAG) showing how the word evolved
-  - Each array is a layer in the DAG, showing historical development where possible
-  - Each combination should show meaningful steps in the word's evolution
-  - For classical compounds, show how each element combined historically
-  - Each combination contains:
-    - id: Unique lowercase identifier
-    - text: The combined text segments
-    - definition: Clear definition with classical context
-    - sourceIds: Array of ids of parts or combinations that form this
-  - The last layer must have exactly one combination (the full word)
-- similarWords: Array of exactly 3 related words that share etymology
-  - word: The related word
-  - explanation: How this word relates to the original
-  - sharedOrigin: The common classical root or pattern they share
-
-Example for "philosophy":
-{
-  "thought": "From Ancient Greek φιλοσοφία (philosophia), combining φίλος (philos) 'loving' and σοφία (sophia) 'wisdom'. The concept emerged in ancient Greece as the 'love of wisdom' and systematic study of fundamental truths.",
-  "parts": [
-    {
-      "id": "phil",
-      "text": "phil",
-      "originalWord": "φίλος",
-      "origin": "Ancient Greek",
-      "meaning": "loving, fond of, attracted to"
-    },
-    {
-      "id": "osophy",
-      "text": "osophy",
-      "originalWord": "σοφία",
-      "origin": "Ancient Greek",
-      "meaning": "wisdom, knowledge, expertise"
-    }
-  ],
-  "combinations": [
-    [
-      {
-        "id": "philosophy",
-        "text": "philosophy",
-        "definition": "the love or pursuit of wisdom and knowledge",
-        "sourceIds": ["phil", "osophy"]
-      }
-    ]
-  ],
-  "similarWords": [
-    {
-      "word": "philology",
-      "explanation": "The study of language and literature, literally 'love of words'",
-      "sharedOrigin": "Greek φίλος (philos) 'loving'"
-    },
-    {
-      "word": "sophia",
-      "explanation": "Wisdom personified, directly from Greek σοφία",
-      "sharedOrigin": "Greek σοφία (sophia) 'wisdom'"
-    },
-    {
-      "word": "philanthropist",
-      "explanation": "Lover of humanity, using same phil- prefix",
-      "sharedOrigin": "Greek φίλος (philos) 'loving'"
-    }
-  ]
-}`,
-        prompt,
-        schema: wordSchema,
-      });
-
-      const errors: string[] = [
-        ...validateWordParts(word, result.object.parts),
-        ...validateUniqueIds(result.object),
-        ...validateCombinations(word, result.object),
-      ];
-
-      if (errors.length > 0) {
-        console.log("validation errors:", errors);
-        attempts.push({
-          errors,
-          output: result.object,
+      try {
+        const result = await generateObject({
+          model: google("gemini-2.0-flash"),
+          system: `You are a linguistic expert specializing in ancient Greek and Latin etymology, with deep knowledge of Indo-European language roots. Your task is to deconstruct words into their meaningful parts, explaining their etymology with a focus on classical origins. Create multiple layers of combinations to form the final meaning of the word.`,
+          prompt,
+          schema: wordSchema,
         });
-        continue;
-      }
 
-      // Simplify the DAG before returning
-      // const simplifiedResult = simplifyDAG(result.object);
-      return NextResponse.json(result.object);
+        const errors: string[] = [
+          ...validateWordParts(word, result.object.parts),
+          ...validateUniqueIds(result.object),
+          ...validateCombinations(word, result.object),
+        ];
+
+        if (errors.length > 0) {
+          console.log("validation errors:", errors);
+          attempts.push({
+            errors,
+            output: result.object,
+          });
+          continue;
+        }
+
+        return NextResponse.json(result.object);
+      } catch (error) {
+        console.error("Error generating word deconstruction:", error);
+        if (error instanceof Error && error.message.includes("timeout")) {
+          return NextResponse.json(
+            { error: "This word is taking too long to process. Try a simpler word." },
+            { status: 408 }
+          );
+        }
+        throw error;
+      }
     }
 
     // Return the last attempt anyway
@@ -375,7 +307,7 @@ Example for "philosophy":
   } catch (error) {
     console.error("Error generating word deconstruction:", error);
     return NextResponse.json(
-      { error: "Failed to generate word deconstruction" },
+      { error: "Unable to process this word. Try another one." },
       { status: 500 }
     );
   }

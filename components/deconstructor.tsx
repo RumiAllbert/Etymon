@@ -683,6 +683,8 @@ function Deconstructor({ word }: { word?: string }) {
         },
       });
 
+      const responseData = await data.json();
+
       if (data.status === 203) {
         toast.info(
           "I had some trouble with that word, but here's my best attempt at breaking it down.",
@@ -690,27 +692,18 @@ function Deconstructor({ word }: { word?: string }) {
             duration: 5000,
           }
         );
+        setDefinition(responseData);
       } else if (!data.ok) {
-        const errorText = await data.text();
-        if (data.status === 400) {
-          throw new Error("Please enter a valid word");
-        } else if (data.status === 500) {
-          throw new Error("I'm having trouble processing that word right now");
-        } else {
-          throw new Error(errorText);
-        }
+        throw new Error(responseData.error || "Failed to process word");
+      } else {
+        setDefinition(responseData);
       }
 
-      const newDefinition = (await data.json()) as Definition;
-      console.log("newDefinition", newDefinition);
-      console.log(JSON.stringify(newDefinition, null, 2));
       plausible("deconstruct", {
         props: {
           word,
         },
       });
-
-      setDefinition(newDefinition);
     } catch (error) {
       plausible("deconstruct_error", {
         props: {
@@ -721,11 +714,9 @@ function Deconstructor({ word }: { word?: string }) {
       const message =
         error instanceof Error
           ? error.message
-          : "I'm having trouble with that word. Try another one?";
+          : "Unable to process this word. Try another one.";
       toast.error(message, {
         duration: 5000,
-        description:
-          "The word might be too complex, too modern, or not found in my etymology database.",
       });
     } finally {
       setIsLoading(false);
