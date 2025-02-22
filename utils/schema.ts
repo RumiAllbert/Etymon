@@ -32,5 +32,5 @@ export const wordSchema = z.object({
       explanation: z.string(),
       sharedOrigin: z.string(),
     })
-  ).length(3),
+  ).min(1).max(3),
 });

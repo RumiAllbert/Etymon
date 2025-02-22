@@ -24,6 +24,43 @@ import Spinner from "./spinner";
 
 const isLoadingAtom = atom(false);
 const showSimilarAtom = atom(false);
+const MAX_CREDITS = 20;
+const CREDITS_KEY = "etymon_credits_used";
+const CREDITS_TIMESTAMP_KEY = "etymon_credits_timestamp";
+
+function isNewDay(timestamp: number) {
+  const date = new Date(timestamp);
+  const now = new Date();
+  return (
+    date.getDate() !== now.getDate() ||
+    date.getMonth() !== now.getMonth() ||
+    date.getFullYear() !== now.getFullYear()
+  );
+}
+
+function getCreditsUsed(): number {
+  if (typeof window === "undefined") return 0;
+
+  const timestamp = parseInt(
+    localStorage.getItem(CREDITS_TIMESTAMP_KEY) || "0",
+    10
+  );
+  if (isNewDay(timestamp)) {
+    // Reset credits if it's a new day
+    localStorage.setItem(CREDITS_KEY, "0");
+    localStorage.setItem(CREDITS_TIMESTAMP_KEY, Date.now().toString());
+    return 0;
+  }
+
+  return parseInt(localStorage.getItem(CREDITS_KEY) || "0", 10);
+}
+
+function incrementCreditsUsed() {
+  if (typeof window === "undefined") return;
+  const current = getCreditsUsed();
+  localStorage.setItem(CREDITS_KEY, (current + 1).toString());
+  localStorage.setItem(CREDITS_TIMESTAMP_KEY, Date.now().toString());
+}
 
 type Combination = {
   id: string;
@@ -661,6 +698,34 @@ const SimilarWordsPanel = ({
   );
 };
 
+const CreditsCounter = () => {
+  const [creditsUsed, setCreditsUsed] = useState(getCreditsUsed);
+
+  useEffect(() => {
+    const updateCredits = () => {
+      setCreditsUsed(getCreditsUsed());
+    };
+
+    window.addEventListener("storage", updateCredits);
+    window.addEventListener("credits_updated", updateCredits);
+
+    return () => {
+      window.removeEventListener("storage", updateCredits);
+      window.removeEventListener("credits_updated", updateCredits);
+    };
+  }, []);
+
+  return (
+    <div className="fixed bottom-4 right-4 px-3 py-1.5 rounded-lg dark:bg-gray-800/90 bg-white/90 backdrop-blur-sm dark:border-gray-700/50 border-gray-200/50 border shadow-lg">
+      <p className="text-sm font-medium">
+        Credits:{" "}
+        <span className="text-blue-500">{MAX_CREDITS - creditsUsed}</span> /{" "}
+        {MAX_CREDITS}
+      </p>
+    </div>
+  );
+};
+
 function Deconstructor({ word }: { word?: string }) {
   const [isLoading, setIsLoading] = useAtom(isLoadingAtom);
   const [definition, setDefinition] = useState<Definition>(defaultDefinition);
@@ -670,6 +735,18 @@ function Deconstructor({ word }: { word?: string }) {
     console.log("handleWordSubmit", word);
     if (!word.trim()) {
       toast.error("Please enter a word");
+      return;
+    }
+
+    const creditsUsed = getCreditsUsed();
+    if (creditsUsed >= MAX_CREDITS) {
+      toast.error(
+        "You've used all your credits for today. Come back tomorrow!",
+        {
+          duration: 8000,
+          description: "Each user gets 20 free word lookups per day.",
+        }
+      );
       return;
     }
 
@@ -693,10 +770,14 @@ function Deconstructor({ word }: { word?: string }) {
           }
         );
         setDefinition(responseData);
+        incrementCreditsUsed();
+        window.dispatchEvent(new Event("credits_updated"));
       } else if (!data.ok) {
         throw new Error(responseData.error || "Failed to process word");
       } else {
         setDefinition(responseData);
+        incrementCreditsUsed();
+        window.dispatchEvent(new Event("credits_updated"));
       }
 
       plausible("deconstruct", {
@@ -797,6 +878,7 @@ export default function WordDeconstructor({ word }: { word?: string }) {
       <ReactFlowProvider>
         <Deconstructor word={word} />
       </ReactFlowProvider>
+      <CreditsCounter />
     </div>
   );
 }
