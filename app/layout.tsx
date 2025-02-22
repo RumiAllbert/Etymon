@@ -21,7 +21,7 @@ export const metadata: Metadata = {
     title: "Etymon.ai",
     siteName: "Etymon.ai",
     description: "Understand the origins of words",
-    images: "/og.png",
+    images: "/public.png",
   },
 };
 
