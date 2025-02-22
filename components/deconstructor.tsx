@@ -5,7 +5,6 @@ import {
   type Edge,
   Handle,
   type Node,
-  Panel,
   Position,
   ReactFlow,
   ReactFlowProvider,
@@ -16,6 +15,7 @@ import {
 } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
 import { atom, useAtom } from "jotai";
+import { BookOpen } from "lucide-react";
 import { usePlausible } from "next-plausible";
 import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
@@ -23,6 +23,7 @@ import { z } from "zod";
 import Spinner from "./spinner";
 
 const isLoadingAtom = atom(false);
+const showSimilarAtom = atom(false);
 
 type Combination = {
   id: string;
@@ -31,16 +32,33 @@ type Combination = {
   sourceIds: string[];
 };
 
-const WordChunkNode = ({ data }: { data: { text: string } }) => {
+const WordChunkNode = ({
+  data,
+}: {
+  data: { text: string; isLastChunk?: boolean };
+}) => {
   const [isLoading] = useAtom(isLoadingAtom);
+  const [showSimilar, setShowSimilar] = useAtom(showSimilarAtom);
+
   return (
     <div
       className={`flex flex-col items-center transition-all duration-1000 ${
         isLoading ? "opacity-0 blur-[20px]" : ""
       }`}
     >
-      <div className="text-5xl font-serif mb-1 dark:text-gray-100 text-gray-900">
-        {data.text}
+      <div className="relative flex items-center">
+        <div className="text-5xl font-serif mb-1 dark:text-gray-100 text-gray-900">
+          {data.text}
+        </div>
+        {data.isLastChunk && (
+          <button
+            onClick={() => setShowSimilar(!showSimilar)}
+            className="absolute -right-8 opacity-50 hover:opacity-100 transition-opacity"
+            title={showSimilar ? "Hide similar words" : "Show similar words"}
+          >
+            <BookOpen className="w-5 h-5" />
+          </button>
+        )}
       </div>
       <div className="w-full h-3 border border-t-0 dark:border-gray-700 border-gray-200" />
       <Handle type="source" position={Position.Bottom} style={{ opacity: 0 }} />
@@ -97,7 +115,11 @@ const OriginNode = ({
 const CombinedNode = ({
   data,
 }: {
-  data: { text: string; definition: string; origin?: string };
+  data: {
+    text: string;
+    definition: string;
+    origin?: string;
+  };
 }) => {
   const [isLoading] = useAtom(isLoadingAtom);
   const colorClass = data.origin ? getOriginColor(data.origin) : "";
@@ -466,13 +488,16 @@ function createInitialNodes(
   });
 
   // Add word parts and their origins
-  definition.parts.forEach((part) => {
+  definition.parts.forEach((part, index) => {
     // Word chunk node
     initialNodes.push({
       id: part.id,
       type: "wordChunk",
       position: { x: 0, y: 0 },
-      data: { text: part.text },
+      data: {
+        text: part.text,
+        isLastChunk: index === definition.parts.length - 1, // Mark the last chunk
+      },
     });
 
     // Origin node - position relative to word chunk width
@@ -501,10 +526,9 @@ function createInitialNodes(
 
   // Add combinations layer by layer
   definition.combinations.forEach((layer, layerIndex) => {
-    const y = (layerIndex + 2) * verticalSpacing; // +2 to leave space for word chunks and origins
+    const y = (layerIndex + 2) * verticalSpacing;
 
     layer.forEach((combination) => {
-      // Determine the origin based on source parts
       const sourceOrigins = combination.sourceIds
         .map((id) => {
           const part = definition.parts.find((p) => p.id === id);
@@ -566,6 +590,7 @@ const SimilarWordsPanel = ({
   onWordClick: (word: string) => Promise<void>;
 }) => {
   const [isLoading] = useAtom(isLoadingAtom);
+  const [showSimilar, setShowSimilar] = useAtom(showSimilarAtom);
 
   const handleClick = async (word: string) => {
     console.log("Similar word clicked:", word);
@@ -580,13 +605,36 @@ const SimilarWordsPanel = ({
     }
   };
 
+  if (!showSimilar) return null;
+
   return (
     <div
-      className={`w-full dark:bg-gray-800/90 bg-white/90 backdrop-blur-sm dark:border-gray-700/50 border-gray-200/50 border rounded-xl p-6 transition-all duration-1000 ${
+      className={`fixed right-4 top-20 w-96 dark:bg-gray-800/90 bg-white/90 backdrop-blur-sm dark:border-gray-700/50 border-gray-200/50 border rounded-xl p-6 transition-all duration-1000 shadow-2xl z-50 ${
         isLoading ? "opacity-0 blur-[20px]" : ""
       }`}
     >
-      <h2 className="text-xl font-serif mb-4">Similar Words</h2>
+      <div className="flex justify-between items-center mb-4">
+        <h2 className="text-xl font-serif">Similar Words</h2>
+        <button
+          onClick={() => setShowSimilar(false)}
+          className="opacity-50 hover:opacity-100 transition-opacity"
+        >
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            width="24"
+            height="24"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          >
+            <line x1="18" y1="6" x2="6" y2="18" />
+            <line x1="6" y1="6" x2="18" y2="18" />
+          </svg>
+        </button>
+      </div>
       <div className="space-y-4">
         {similarWords.map((word, i) => (
           <div key={i} className="space-y-1">
@@ -693,39 +741,24 @@ function Deconstructor({ word }: { word?: string }) {
   }, [nodes]);
 
   return (
-    <div className="h-full w-full md:block flex flex-col">
-      <div className="md:h-full h-[80vh]">
-        <ReactFlow
-          nodes={nodes}
-          edges={edges}
-          onNodesChange={onNodesChange}
-          onEdgesChange={onEdgesChange}
-          nodeTypes={nodeTypes}
-          className="bg-background"
-          proOptions={{ hideAttribution: true }}
-        >
-          <Background color="currentColor" className="opacity-5" />
-          {definition.similarWords && (
-            <Panel
-              position="top-right"
-              className="pointer-events-auto md:block hidden"
-            >
-              <SimilarWordsPanel
-                similarWords={definition.similarWords}
-                onWordClick={handleWordSubmit}
-              />
-            </Panel>
-          )}
-        </ReactFlow>
-      </div>
-      {definition.similarWords && (
-        <div className="md:hidden w-full px-4 pb-8">
+    <div className="h-full w-full">
+      <ReactFlow
+        nodes={nodes}
+        edges={edges}
+        onNodesChange={onNodesChange}
+        onEdgesChange={onEdgesChange}
+        nodeTypes={nodeTypes}
+        className="bg-background"
+        proOptions={{ hideAttribution: true }}
+      >
+        <Background color="currentColor" className="opacity-5" />
+        {definition.similarWords && (
           <SimilarWordsPanel
             similarWords={definition.similarWords}
             onWordClick={handleWordSubmit}
           />
-        </div>
-      )}
+        )}
+      </ReactFlow>
     </div>
   );
 }
