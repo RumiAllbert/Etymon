@@ -1,7 +1,4 @@
-I'll help you modify the README.md. Here's the updated version:
-
-```markdown:README.md
-# Etymon 🔍
+# Etymon.ai 🔍
 
 A beautiful and interactive web application that deconstructs words into their meaningful parts and explains their etymology, with a special focus on Ancient Greek and Latin roots. Built with Next.js, React Flow, and powered by AI. 📚
 
