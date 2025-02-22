@@ -24,9 +24,12 @@ import Spinner from "./spinner";
 
 const isLoadingAtom = atom(false);
 const showSimilarAtom = atom(false);
+const inputValueAtom = atom("");
 const MAX_CREDITS = 20;
 const CREDITS_KEY = "etymon_credits_used";
 const CREDITS_TIMESTAMP_KEY = "etymon_credits_timestamp";
+const CACHE_PREFIX = "etymon_cache_";
+const CACHE_EXPIRY = 60 * 60 * 1000; // 1 hour in milliseconds
 
 function isNewDay(timestamp: number) {
   const date = new Date(timestamp);
@@ -111,6 +114,21 @@ const getOriginColor = (origin: string) => {
   if (lowerOrigin.includes("latin")) {
     return "dark:bg-red-500/20 bg-red-500/10 dark:text-red-300 text-red-600";
   }
+  if (lowerOrigin.includes("spanish") || lowerOrigin.includes("romance")) {
+    return "dark:bg-orange-500/20 bg-orange-500/10 dark:text-orange-300 text-orange-600";
+  }
+  if (lowerOrigin.includes("french")) {
+    return "dark:bg-purple-500/20 bg-purple-500/10 dark:text-purple-300 text-purple-600";
+  }
+  if (lowerOrigin.includes("german") || lowerOrigin.includes("germanic")) {
+    return "dark:bg-yellow-500/20 bg-yellow-500/10 dark:text-yellow-300 text-yellow-600";
+  }
+  if (lowerOrigin.includes("arabic") || lowerOrigin.includes("semitic")) {
+    return "dark:bg-cyan-500/20 bg-cyan-500/10 dark:text-cyan-300 text-cyan-600";
+  }
+  if (lowerOrigin.includes("sanskrit") || lowerOrigin.includes("indo")) {
+    return "dark:bg-pink-500/20 bg-pink-500/10 dark:text-pink-300 text-pink-600";
+  }
   return "dark:bg-gray-500/20 bg-gray-500/10 dark:text-gray-300 text-gray-600";
 };
 
@@ -130,15 +148,17 @@ const OriginNode = ({
     >
       <div className="px-4 py-2 rounded-lg dark:bg-gray-800 bg-white dark:border-gray-700/50 border-gray-200/50 border min-w-fit max-w-[180px]">
         <div className="flex flex-col items-start">
-          <p className="text-lg font-serif mb-1 whitespace-nowrap dark:text-gray-100 text-gray-900">
+          <p className="text-lg font-serif mb-1.5 whitespace-nowrap dark:text-gray-100 text-gray-900">
             {data.originalWord}
           </p>
-          <span
-            className={`px-2 py-0.5 text-xs font-medium rounded-full ${colorClass}`}
-          >
-            {data.origin}
-          </span>
-          <p className="text-xs dark:text-gray-300 text-gray-700 w-full mt-1">
+          <div className="-ml-1">
+            <span
+              className={`px-2 py-0.5 text-xs font-medium rounded-full ${colorClass}`}
+            >
+              {data.origin}
+            </span>
+          </div>
+          <p className="text-xs dark:text-gray-300 text-gray-700 w-full mt-2">
             {data.meaning}
           </p>
         </div>
@@ -253,40 +273,48 @@ const InputNode = ({
 }: {
   data: { onSubmit: (word: string) => Promise<void>; initialWord?: string };
 }) => {
-  const [word, setWord] = useState(data.initialWord || "");
   const [isLoading, setIsLoading] = useAtom(isLoadingAtom);
+  const [inputValue, setInputValue] = useAtom(inputValueAtom);
+
   const placeholder = useTypingAnimation(
     [
       "Enter a word",
-      "Φιλοσοφία", // Greek: "philosophy"
-      "Generare", // Latin: "to generate"
-      "Bibliotheca", // Latin: "library"
-      "Democracy", // English
-      "Metamorphosis", // English from Greek
-      "Esperanza", // Spanish: "hope"
-      "Mariposa", // Spanish: "butterfly"
-      "Ἀλήθεια", // Greek: "truth"
-      "Felicitas", // Latin: "happiness"
-      "Synchronicity", // English from Greek
-      "Libertad", // Spanish: "freedom"
+      "Φιλοσοφία",
+      "Generare",
+      "Bibliotheca",
+      "Democracy",
+      "Metamorphosis",
+      "Esperanza",
+      "Mariposa",
+      "Ἀλήθεια",
+      "Felicitas",
+      "Synchronicity",
+      "Libertad",
     ],
-    100, // typing speed
-    50, // deleting speed
-    2000 // pause duration
+    100,
+    50,
+    2000
   );
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!word.trim()) return;
+    if (!inputValue.trim()) return;
 
     setIsLoading(true);
     await Promise.all([
-      data.onSubmit(word),
+      data.onSubmit(inputValue),
       new Promise((resolve) => setTimeout(resolve, 1000)),
     ]);
     await new Promise((resolve) => setTimeout(resolve, 100));
     setIsLoading(false);
   };
+
+  // Set initial value if provided
+  useEffect(() => {
+    if (data.initialWord) {
+      setInputValue(data.initialWord);
+    }
+  }, [data.initialWord]);
 
   return (
     <div className="flex flex-col items-center gap-4">
@@ -304,8 +332,8 @@ const InputNode = ({
       >
         <input
           type="text"
-          value={word}
-          onChange={(e) => setWord(e.target.value)}
+          value={inputValue}
+          onChange={(e) => setInputValue(e.target.value)}
           placeholder={placeholder}
           className="flex-1 px-3 py-2 rounded-lg dark:bg-gray-900/50 bg-gray-50/50 dark:border-gray-700/50 border-gray-200/50 border dark:text-gray-100 text-gray-900 dark:placeholder-gray-500 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500/50"
           disabled={isLoading}
@@ -509,6 +537,46 @@ const defaultDefinition: Definition = {
   ],
 };
 
+function getCachedWord(word: string): Definition | null {
+  if (typeof window === "undefined") return null;
+
+  const cacheKey = CACHE_PREFIX + word.toLowerCase();
+  const cached = localStorage.getItem(cacheKey);
+
+  if (!cached) return null;
+
+  try {
+    const { data, timestamp } = JSON.parse(cached);
+
+    // Check if cache has expired
+    if (Date.now() - timestamp > CACHE_EXPIRY) {
+      localStorage.removeItem(cacheKey);
+      return null;
+    }
+
+    return data;
+  } catch (error) {
+    console.error("Error parsing cached data:", error);
+    return null;
+  }
+}
+
+function cacheWord(word: string, data: Definition) {
+  if (typeof window === "undefined") return;
+
+  const cacheKey = CACHE_PREFIX + word.toLowerCase();
+  const cacheData = {
+    data,
+    timestamp: Date.now(),
+  };
+
+  try {
+    localStorage.setItem(cacheKey, JSON.stringify(cacheData));
+  } catch (error) {
+    console.error("Error caching word data:", error);
+  }
+}
+
 function createInitialNodes(
   definition: Definition,
   handleWordSubmit: (word: string) => Promise<void>,
@@ -628,6 +696,7 @@ const SimilarWordsPanel = ({
 }) => {
   const [isLoading] = useAtom(isLoadingAtom);
   const [showSimilar, setShowSimilar] = useAtom(showSimilarAtom);
+  const [, setInputValue] = useAtom(inputValueAtom);
 
   const handleClick = async (word: string) => {
     console.log("Similar word clicked:", word);
@@ -638,6 +707,7 @@ const SimilarWordsPanel = ({
     try {
       setShowSimilar(false); // Hide the panel when clicking a word
       await onWordClick(word);
+      setInputValue(""); // Clear the input value using the atom
     } catch (error) {
       console.error("Error handling similar word click:", error);
       toast.error("Failed to look up similar word. Please try again.");
@@ -699,9 +769,13 @@ const SimilarWordsPanel = ({
 };
 
 const CreditsCounter = () => {
-  const [creditsUsed, setCreditsUsed] = useState(getCreditsUsed);
+  // Start with null to avoid hydration mismatch
+  const [creditsUsed, setCreditsUsed] = useState<number | null>(null);
 
   useEffect(() => {
+    // Set initial value after component mounts
+    setCreditsUsed(getCreditsUsed());
+
     const updateCredits = () => {
       setCreditsUsed(getCreditsUsed());
     };
@@ -714,6 +788,9 @@ const CreditsCounter = () => {
       window.removeEventListener("credits_updated", updateCredits);
     };
   }, []);
+
+  // Don't render anything until after hydration
+  if (creditsUsed === null) return null;
 
   return (
     <div className="fixed bottom-4 right-4 px-3 py-1.5 rounded-lg dark:bg-gray-800/90 bg-white/90 backdrop-blur-sm dark:border-gray-700/50 border-gray-200/50 border shadow-lg">
@@ -735,6 +812,15 @@ function Deconstructor({ word }: { word?: string }) {
     console.log("handleWordSubmit", word);
     if (!word.trim()) {
       toast.error("Please enter a word");
+      return;
+    }
+
+    // Check cache first
+    const cached = getCachedWord(word);
+    if (cached) {
+      console.log("Using cached data for:", word);
+      setDefinition(cached);
+      toast.success("Retrieved from cache", { duration: 2000 });
       return;
     }
 
@@ -772,12 +858,14 @@ function Deconstructor({ word }: { word?: string }) {
         setDefinition(responseData);
         incrementCreditsUsed();
         window.dispatchEvent(new Event("credits_updated"));
+        cacheWord(word, responseData); // Cache the response
       } else if (!data.ok) {
         throw new Error(responseData.error || "Failed to process word");
       } else {
         setDefinition(responseData);
         incrementCreditsUsed();
         window.dispatchEvent(new Event("credits_updated"));
+        cacheWord(word, responseData); // Cache the response
       }
 
       plausible("deconstruct", {
