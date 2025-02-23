@@ -26,9 +26,10 @@ const isLoadingAtom = atom(false);
 const showSimilarAtom = atom(false);
 const inputValueAtom = atom("");
 const showHistoryAtom = atom(false);
-const MAX_CREDITS = 20;
+const MAX_CREDITS = 15;
 const CREDITS_KEY = "etymon_credits_used";
 const CREDITS_TIMESTAMP_KEY = "etymon_credits_timestamp";
+const CREDITS_INTERVAL = 6 * 60 * 60 * 1000; // 6 hours in milliseconds
 const CACHE_PREFIX = "etymon_cache_";
 const CACHE_EXPIRY = 30 * 60 * 1000; // 30 minutes in milliseconds
 const HISTORY_KEY = "etymon_search_history";
@@ -73,14 +74,8 @@ function addToSearchHistory(word: string) {
   }
 }
 
-function isNewDay(timestamp: number) {
-  const date = new Date(timestamp);
-  const now = new Date();
-  return (
-    date.getDate() !== now.getDate() ||
-    date.getMonth() !== now.getMonth() ||
-    date.getFullYear() !== now.getFullYear()
-  );
+function isNewInterval(timestamp: number) {
+  return Date.now() - timestamp >= CREDITS_INTERVAL;
 }
 
 function getCreditsUsed(): number {
@@ -90,8 +85,8 @@ function getCreditsUsed(): number {
     localStorage.getItem(CREDITS_TIMESTAMP_KEY) || "0",
     10
   );
-  if (isNewDay(timestamp)) {
-    // Reset credits if it's a new day
+  if (isNewInterval(timestamp)) {
+    // Reset credits if it's a new interval
     localStorage.setItem(CREDITS_KEY, "0");
     localStorage.setItem(CREDITS_TIMESTAMP_KEY, Date.now().toString());
     return 0;
@@ -951,11 +946,9 @@ const SimilarWordsPanel = ({
 };
 
 const CreditsCounter = () => {
-  // Start with null to avoid hydration mismatch
   const [creditsUsed, setCreditsUsed] = useState<number | null>(null);
 
   useEffect(() => {
-    // Set initial value after component mounts
     setCreditsUsed(getCreditsUsed());
 
     const updateCredits = () => {
@@ -971,11 +964,10 @@ const CreditsCounter = () => {
     };
   }, []);
 
-  // Don't render anything until after hydration
   if (creditsUsed === null) return null;
 
   return (
-    <div className="fixed bottom-4 right-4 px-3 py-1.5 rounded-lg dark:bg-gray-800/90 bg-white/90 backdrop-blur-sm dark:border-gray-700/50 border-gray-200/50 border shadow-lg">
+    <div className="fixed bottom-4 right-4 px-3 py-1.5 rounded-lg dark:bg-gray-800/90 bg-white/90 backdrop-blur-sm dark:border-gray-700/50 border-gray-200/50 border shadow-lg z-50">
       <p className="text-sm font-medium">
         Credits:{" "}
         <span className="text-blue-500">{MAX_CREDITS - creditsUsed}</span> /{" "}
@@ -1008,11 +1000,18 @@ function Deconstructor({ word }: { word?: string }) {
 
     const creditsUsed = getCreditsUsed();
     if (creditsUsed >= MAX_CREDITS) {
+      const timestamp = parseInt(
+        localStorage.getItem(CREDITS_TIMESTAMP_KEY) || "0",
+        10
+      );
+      const timeLeft = CREDITS_INTERVAL - (Date.now() - timestamp);
+      const hoursLeft = Math.ceil(timeLeft / (1000 * 60 * 60));
+
       toast.error(
-        "You've used all your credits for today. Come back tomorrow!",
+        "You've used all your credits. Please wait for the next refresh.",
         {
           duration: 8000,
-          description: "Each user gets 20 free word lookups per day.",
+          description: `You get ${MAX_CREDITS} credits every 6 hours. Next refresh in ~${hoursLeft} hours.`,
         }
       );
       return;
