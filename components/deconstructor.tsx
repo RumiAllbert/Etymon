@@ -25,11 +25,53 @@ import Spinner from "./spinner";
 const isLoadingAtom = atom(false);
 const showSimilarAtom = atom(false);
 const inputValueAtom = atom("");
+const showHistoryAtom = atom(false);
 const MAX_CREDITS = 20;
 const CREDITS_KEY = "etymon_credits_used";
 const CREDITS_TIMESTAMP_KEY = "etymon_credits_timestamp";
 const CACHE_PREFIX = "etymon_cache_";
 const CACHE_EXPIRY = 30 * 60 * 1000; // 30 minutes in milliseconds
+const HISTORY_KEY = "etymon_search_history";
+const MAX_HISTORY_ITEMS = 10;
+
+type SearchHistoryItem = {
+  word: string;
+  timestamp: number;
+};
+
+function getSearchHistory(): SearchHistoryItem[] {
+  if (typeof window === "undefined") return [];
+  try {
+    const history = localStorage.getItem(HISTORY_KEY);
+    return history ? JSON.parse(history) : [];
+  } catch (error) {
+    console.error("Error reading search history:", error);
+    return [];
+  }
+}
+
+function addToSearchHistory(word: string) {
+  if (typeof window === "undefined") return;
+  try {
+    const history = getSearchHistory();
+    const normalizedWord = normalizeWord(word);
+
+    // Remove existing entry of the same word if it exists
+    const filteredHistory = history.filter(
+      (item) => normalizeWord(item.word) !== normalizedWord
+    );
+
+    // Add new entry at the beginning
+    const newHistory = [
+      { word, timestamp: Date.now() },
+      ...filteredHistory,
+    ].slice(0, MAX_HISTORY_ITEMS); // Keep only the latest 10 items
+
+    localStorage.setItem(HISTORY_KEY, JSON.stringify(newHistory));
+  } catch (error) {
+    console.error("Error updating search history:", error);
+  }
+}
 
 function isNewDay(timestamp: number) {
   const date = new Date(timestamp);
@@ -268,6 +310,75 @@ const useTypingAnimation = (
   return placeholder;
 };
 
+const HistoryPanel = ({
+  onWordClick,
+}: {
+  onWordClick: (word: string) => Promise<void>;
+}) => {
+  const [isLoading] = useAtom(isLoadingAtom);
+  const [showHistory, setShowHistory] = useAtom(showHistoryAtom);
+  const [, setInputValue] = useAtom(inputValueAtom);
+  const history = getSearchHistory();
+
+  const handleClick = async (word: string) => {
+    if (isLoading) return;
+    try {
+      setShowHistory(false);
+      await onWordClick(word);
+      setInputValue("");
+    } catch (error) {
+      console.error("Error handling history word click:", error);
+      toast.error("Failed to look up word from history. Please try again.");
+    }
+  };
+
+  if (!showHistory || history.length === 0) return null;
+
+  return (
+    <div className="fixed right-4 top-20 w-96 dark:bg-gray-800/90 bg-white/90 backdrop-blur-sm dark:border-gray-700/50 border-gray-200/50 border rounded-xl p-6 transition-all duration-1000 shadow-2xl z-50">
+      <div className="flex justify-between items-center mb-4">
+        <h2 className="text-xl font-serif">Recent Searches</h2>
+        <button
+          onClick={() => setShowHistory(false)}
+          className="opacity-50 hover:opacity-100 transition-opacity"
+        >
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            width="24"
+            height="24"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          >
+            <line x1="18" y1="6" x2="6" y2="18" />
+            <line x1="6" y1="6" x2="18" y2="18" />
+          </svg>
+        </button>
+      </div>
+      <div className="space-y-2">
+        {history.map((item, i) => (
+          <div key={i} className="flex justify-between items-center">
+            <button
+              type="button"
+              onClick={() => handleClick(item.word)}
+              disabled={isLoading}
+              className="text-lg font-serif dark:text-blue-400 text-blue-600 hover:dark:text-blue-300 hover:text-blue-500 transition-colors text-left disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {item.word}
+            </button>
+            <span className="text-xs dark:text-gray-400 text-gray-500">
+              {new Date(item.timestamp).toLocaleDateString()}
+            </span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+};
+
 const InputNode = ({
   data,
 }: {
@@ -275,6 +386,8 @@ const InputNode = ({
 }) => {
   const [isLoading, setIsLoading] = useAtom(isLoadingAtom);
   const [inputValue, setInputValue] = useAtom(inputValueAtom);
+  const [showHistory, setShowHistory] = useAtom(showHistoryAtom);
+  const history = getSearchHistory();
 
   const placeholder = useTypingAnimation(
     [
@@ -305,6 +418,7 @@ const InputNode = ({
       data.onSubmit(inputValue),
       new Promise((resolve) => setTimeout(resolve, 1000)),
     ]);
+    addToSearchHistory(inputValue); // Add to history after successful lookup
     await new Promise((resolve) => setTimeout(resolve, 100));
     setIsLoading(false);
   };
@@ -338,15 +452,39 @@ const InputNode = ({
           className="flex-1 px-3 py-2 rounded-lg dark:bg-gray-900/50 bg-gray-50/50 dark:border-gray-700/50 border-gray-200/50 border dark:text-gray-100 text-gray-900 dark:placeholder-gray-500 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500/50"
           disabled={isLoading}
         />
-        <button
-          type="submit"
-          disabled={isLoading}
-          className={`w-[120px] px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-medium disabled:opacity-50 transition-colors flex items-center justify-center ${
-            isLoading ? "cursor-not-allowed" : ""
-          }`}
-        >
-          {isLoading ? <Spinner /> : "Etymologize"}
-        </button>
+        <div className="flex gap-2">
+          {history.length > 0 && (
+            <button
+              type="button"
+              onClick={() => setShowHistory(!showHistory)}
+              disabled={isLoading}
+              className="px-3 py-2 rounded-lg dark:bg-gray-700/50 bg-gray-100/50 hover:dark:bg-gray-600/50 hover:bg-gray-200/50 dark:text-gray-300 text-gray-700 transition-colors disabled:opacity-50"
+              title="View search history"
+            >
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                width="20"
+                height="20"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
+                <path d="M12 8v4l3 3" />
+                <circle cx="12" cy="12" r="10" />
+              </svg>
+            </button>
+          )}
+          <button
+            type="submit"
+            disabled={isLoading}
+            className="w-[120px] px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-medium disabled:opacity-50 transition-colors flex items-center justify-center"
+          >
+            {isLoading ? <Spinner /> : "Etymologize"}
+          </button>
+        </div>
       </form>
     </div>
   );
@@ -750,6 +888,7 @@ const SimilarWordsPanel = ({
     try {
       setShowSimilar(false); // Hide the panel when clicking a word
       await onWordClick(word);
+      addToSearchHistory(word); // Add the similar word to history
       setInputValue(""); // Clear the input value using the atom
     } catch (error) {
       console.error("Error handling similar word click:", error);
@@ -991,6 +1130,7 @@ function Deconstructor({ word }: { word?: string }) {
             onWordClick={handleWordSubmit}
           />
         )}
+        <HistoryPanel onWordClick={handleWordSubmit} />
       </ReactFlow>
     </div>
   );
