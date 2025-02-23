@@ -537,16 +537,21 @@ const defaultDefinition: Definition = {
   ],
 };
 
+function normalizeWord(word: string): string {
+  return word.toLowerCase().trim().replace(/\s+/g, "");
+}
+
 function getCachedWord(word: string): Definition | null {
   if (typeof window === "undefined") return null;
 
-  const cacheKey = CACHE_PREFIX + word.toLowerCase();
+  const normalizedWord = normalizeWord(word);
+  const cacheKey = CACHE_PREFIX + normalizedWord;
   const cached = localStorage.getItem(cacheKey);
 
   if (!cached) return null;
 
   try {
-    const { data, timestamp } = JSON.parse(cached);
+    const { data, timestamp, originalWord } = JSON.parse(cached);
 
     // Check if cache has expired
     if (Date.now() - timestamp > CACHE_EXPIRY) {
@@ -554,9 +559,16 @@ function getCachedWord(word: string): Definition | null {
       return null;
     }
 
+    // Verify the cached data matches the requested word
+    if (normalizeWord(originalWord) !== normalizedWord) {
+      localStorage.removeItem(cacheKey);
+      return null;
+    }
+
     return data;
   } catch (error) {
     console.error("Error parsing cached data:", error);
+    localStorage.removeItem(cacheKey);
     return null;
   }
 }
@@ -564,16 +576,47 @@ function getCachedWord(word: string): Definition | null {
 function cacheWord(word: string, data: Definition) {
   if (typeof window === "undefined") return;
 
-  const cacheKey = CACHE_PREFIX + word.toLowerCase();
+  const normalizedWord = normalizeWord(word);
+  const cacheKey = CACHE_PREFIX + normalizedWord;
   const cacheData = {
     data,
     timestamp: Date.now(),
+    originalWord: word, // Store the original word for validation
   };
 
   try {
     localStorage.setItem(cacheKey, JSON.stringify(cacheData));
   } catch (error) {
     console.error("Error caching word data:", error);
+    // If storage fails, try to clear old cache entries
+    try {
+      clearOldCache();
+    } catch (e) {
+      console.error("Error clearing old cache:", e);
+    }
+  }
+}
+
+function clearOldCache() {
+  if (typeof window === "undefined") return;
+
+  const now = Date.now();
+  for (let i = 0; i < localStorage.length; i++) {
+    const key = localStorage.key(i);
+    if (key?.startsWith(CACHE_PREFIX)) {
+      try {
+        const cached = localStorage.getItem(key);
+        if (cached) {
+          const { timestamp } = JSON.parse(cached);
+          if (now - timestamp > CACHE_EXPIRY) {
+            localStorage.removeItem(key);
+          }
+        }
+      } catch (error) {
+        console.error("Error checking cache entry:", error);
+        localStorage.removeItem(key);
+      }
+    }
   }
 }
 
