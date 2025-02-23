@@ -29,7 +29,7 @@ const MAX_CREDITS = 20;
 const CREDITS_KEY = "etymon_credits_used";
 const CREDITS_TIMESTAMP_KEY = "etymon_credits_timestamp";
 const CACHE_PREFIX = "etymon_cache_";
-const CACHE_EXPIRY = 60 * 60 * 1000; // 1 hour in milliseconds
+const CACHE_EXPIRY = 30 * 60 * 1000; // 30 minutes in milliseconds
 
 function isNewDay(timestamp: number) {
   const date = new Date(timestamp);
