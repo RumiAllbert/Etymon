@@ -989,6 +989,8 @@ function Deconstructor({ word }: { word?: string }) {
       return;
     }
 
+    const normalizedWord = normalizeWord(word);
+
     // Check cache first
     const cached = getCachedWord(word);
     if (cached) {
@@ -1019,7 +1021,7 @@ function Deconstructor({ word }: { word?: string }) {
 
     try {
       setIsLoading(true);
-      const data = await fetch("/api", {
+      const response = await fetch("/api", {
         method: "POST",
         body: JSON.stringify({ word }),
         headers: {
@@ -1027,27 +1029,40 @@ function Deconstructor({ word }: { word?: string }) {
         },
       });
 
-      const responseData = await data.json();
+      const responseData = await response.json();
 
-      if (data.status === 203) {
+      // Validate the response data against the schema
+      const validatedData = wordSchema.parse(responseData);
+
+      // Double check that the response is for the correct word by checking parts
+      const isValidResponse = validatedData.parts.some(
+        (part) =>
+          normalizeWord(part.originalWord).includes(normalizedWord) ||
+          normalizeWord(part.text).includes(normalizedWord)
+      );
+
+      if (!isValidResponse) {
+        throw new Error(
+          "Received invalid etymology data for the requested word"
+        );
+      }
+
+      if (response.status === 203) {
         toast.info(
           "I had some trouble with that word, but here's my best attempt at breaking it down.",
           {
             duration: 5000,
           }
         );
-        setDefinition(responseData);
-        incrementCreditsUsed();
-        window.dispatchEvent(new Event("credits_updated"));
-        cacheWord(word, responseData); // Cache the response
-      } else if (!data.ok) {
+      } else if (!response.ok) {
         throw new Error(responseData.error || "Failed to process word");
-      } else {
-        setDefinition(responseData);
-        incrementCreditsUsed();
-        window.dispatchEvent(new Event("credits_updated"));
-        cacheWord(word, responseData); // Cache the response
       }
+
+      // Only cache and update state if we have valid data
+      setDefinition(validatedData);
+      incrementCreditsUsed();
+      window.dispatchEvent(new Event("credits_updated"));
+      cacheWord(word, validatedData);
 
       plausible("deconstruct", {
         props: {
@@ -1068,6 +1083,10 @@ function Deconstructor({ word }: { word?: string }) {
       toast.error(message, {
         duration: 5000,
       });
+
+      // Clear any potentially corrupted cache for this word
+      const cacheKey = CACHE_PREFIX + normalizedWord;
+      localStorage.removeItem(cacheKey);
     } finally {
       setIsLoading(false);
     }
