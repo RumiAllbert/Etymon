@@ -671,14 +671,15 @@ const defaultDefinition: Definition = {
 };
 
 function normalizeWord(word: string): string {
+  // Remove extra spaces and convert to lowercase
   return word.toLowerCase().trim().replace(/\s+/g, "");
 }
 
 function getCachedWord(word: string): Definition | null {
   if (typeof window === "undefined") return null;
 
-  const normalizedWord = normalizeWord(word);
-  const cacheKey = CACHE_PREFIX + normalizedWord;
+  const normalizedSearchWord = normalizeWord(word);
+  const cacheKey = CACHE_PREFIX + normalizedSearchWord;
   const cached = localStorage.getItem(cacheKey);
 
   if (!cached) return null;
@@ -692,8 +693,17 @@ function getCachedWord(word: string): Definition | null {
       return null;
     }
 
-    // Verify the cached data matches the requested word
-    if (normalizeWord(originalWord) !== normalizedWord) {
+    // Strict equality check for normalized words
+    if (normalizeWord(originalWord) !== normalizedSearchWord) {
+      localStorage.removeItem(cacheKey);
+      return null;
+    }
+
+    // Validate the cached data against the schema
+    try {
+      wordSchema.parse(data);
+    } catch (error) {
+      console.error("Invalid cached data schema:", error);
       localStorage.removeItem(cacheKey);
       return null;
     }
@@ -711,10 +721,19 @@ function cacheWord(word: string, data: Definition) {
 
   const normalizedWord = normalizeWord(word);
   const cacheKey = CACHE_PREFIX + normalizedWord;
+
+  // Validate data before caching
+  try {
+    wordSchema.parse(data);
+  } catch (error) {
+    console.error("Invalid data schema for caching:", error);
+    return;
+  }
+
   const cacheData = {
     data,
     timestamp: Date.now(),
-    originalWord: word, // Store the original word for validation
+    originalWord: word,
   };
 
   try {
@@ -724,6 +743,8 @@ function cacheWord(word: string, data: Definition) {
     // If storage fails, try to clear old cache entries
     try {
       clearOldCache();
+      // Try one more time after clearing old entries
+      localStorage.setItem(cacheKey, JSON.stringify(cacheData));
     } catch (e) {
       console.error("Error clearing old cache:", e);
     }
