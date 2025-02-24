@@ -1,3 +1,4 @@
+import GoogleAnalytics from "@/components/google-analytics";
 import Outbound from "@/components/outbound";
 import { ThemeProvider } from "@/components/theme-provider";
 import ThemeToggle from "@/components/theme-toggle";
@@ -48,6 +49,9 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en" suppressHydrationWarning>
+      <head>
+        <GoogleAnalytics />
+      </head>
       <body className={notoSerif.className} suppressHydrationWarning>
         <ThemeProvider
           attribute="class"
