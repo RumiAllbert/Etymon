@@ -1031,21 +1031,12 @@ function Deconstructor({ word }: { word?: string }) {
 
       const responseData = await response.json();
 
+      if (!response.ok && response.status !== 203) {
+        throw new Error(responseData.error || "Failed to process word");
+      }
+
       // Validate the response data against the schema
       const validatedData = wordSchema.parse(responseData);
-
-      // Double check that the response is for the correct word by checking parts
-      const isValidResponse = validatedData.parts.some(
-        (part) =>
-          normalizeWord(part.originalWord).includes(normalizedWord) ||
-          normalizeWord(part.text).includes(normalizedWord)
-      );
-
-      if (!isValidResponse) {
-        throw new Error(
-          "Received invalid etymology data for the requested word"
-        );
-      }
 
       if (response.status === 203) {
         toast.info(
@@ -1054,8 +1045,6 @@ function Deconstructor({ word }: { word?: string }) {
             duration: 5000,
           }
         );
-      } else if (!response.ok) {
-        throw new Error(responseData.error || "Failed to process word");
       }
 
       // Only cache and update state if we have valid data
