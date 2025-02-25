@@ -69,6 +69,7 @@ function addToSearchHistory(word: string) {
     ].slice(0, MAX_HISTORY_ITEMS); // Keep only the latest 10 items
 
     localStorage.setItem(HISTORY_KEY, JSON.stringify(newHistory));
+    console.log("Updated search history with:", word);
   } catch (error) {
     console.error("Error updating search history:", error);
   }
@@ -681,26 +682,27 @@ function getCachedWord(word: string): Definition | null {
 
     // Check if cache has expired
     if (Date.now() - timestamp > CACHE_EXPIRY) {
+      console.log("Cache expired for:", word);
       localStorage.removeItem(cacheKey);
       return null;
     }
 
     // Strict equality check for normalized words
     if (normalizeWord(originalWord) !== normalizedSearchWord) {
+      console.log("Cache mismatch for:", word, "vs", originalWord);
       localStorage.removeItem(cacheKey);
       return null;
     }
 
     // Validate the cached data against the schema
     try {
-      wordSchema.parse(data);
+      const validatedData = wordSchema.parse(data);
+      return validatedData;
     } catch (error) {
       console.error("Invalid cached data schema:", error);
       localStorage.removeItem(cacheKey);
       return null;
     }
-
-    return data;
   } catch (error) {
     console.error("Error parsing cached data:", error);
     localStorage.removeItem(cacheKey);
@@ -711,58 +713,82 @@ function getCachedWord(word: string): Definition | null {
 function cacheWord(word: string, data: Definition) {
   if (typeof window === "undefined") return;
 
-  const normalizedWord = normalizeWord(word);
-  const cacheKey = CACHE_PREFIX + normalizedWord;
-
-  // Validate data before caching
   try {
-    wordSchema.parse(data);
-  } catch (error) {
-    console.error("Invalid data schema for caching:", error);
-    return;
-  }
+    const normalizedWord = normalizeWord(word);
+    const cacheKey = CACHE_PREFIX + normalizedWord;
 
-  const cacheData = {
-    data,
-    timestamp: Date.now(),
-    originalWord: word,
-  };
-
-  try {
-    localStorage.setItem(cacheKey, JSON.stringify(cacheData));
-  } catch (error) {
-    console.error("Error caching word data:", error);
-    // If storage fails, try to clear old cache entries
+    // Validate data before caching
     try {
-      clearOldCache();
-      // Try one more time after clearing old entries
-      localStorage.setItem(cacheKey, JSON.stringify(cacheData));
-    } catch (e) {
-      console.error("Error clearing old cache:", e);
+      wordSchema.parse(data);
+    } catch (error) {
+      console.error("Invalid data schema for caching:", error);
+      return;
     }
+
+    const cacheData = {
+      data,
+      timestamp: Date.now(),
+      originalWord: word,
+    };
+
+    try {
+      localStorage.setItem(cacheKey, JSON.stringify(cacheData));
+      console.log("Successfully cached word:", word);
+    } catch (error) {
+      console.error("Error caching word data:", error);
+      // If storage fails, try to clear old cache entries
+      try {
+        clearOldCache();
+        // Try one more time after clearing old entries
+        localStorage.setItem(cacheKey, JSON.stringify(cacheData));
+        console.log("Successfully cached word after clearing old cache:", word);
+      } catch (e) {
+        console.error("Error clearing old cache:", e);
+      }
+    }
+  } catch (error) {
+    console.error("Unexpected error in cacheWord:", error);
   }
 }
 
 function clearOldCache() {
   if (typeof window === "undefined") return;
 
-  const now = Date.now();
-  for (let i = 0; i < localStorage.length; i++) {
-    const key = localStorage.key(i);
-    if (key?.startsWith(CACHE_PREFIX)) {
-      try {
-        const cached = localStorage.getItem(key);
-        if (cached) {
-          const { timestamp } = JSON.parse(cached);
-          if (now - timestamp > CACHE_EXPIRY) {
-            localStorage.removeItem(key);
+  try {
+    const now = Date.now();
+    const keysToRemove = [];
+
+    // Find all cache keys
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i);
+      if (key && key.startsWith(CACHE_PREFIX)) {
+        try {
+          const cached = localStorage.getItem(key);
+          if (cached) {
+            const { timestamp } = JSON.parse(cached);
+            if (now - timestamp > CACHE_EXPIRY) {
+              keysToRemove.push(key);
+            }
           }
+        } catch (e) {
+          // If we can't parse this item, it's probably corrupted, so remove it
+          keysToRemove.push(key);
         }
-      } catch (error) {
-        console.error("Error checking cache entry:", error);
-        localStorage.removeItem(key);
       }
     }
+
+    // Remove expired keys
+    keysToRemove.forEach((key) => {
+      try {
+        localStorage.removeItem(key);
+      } catch (e) {
+        console.error("Error removing key:", key, e);
+      }
+    });
+
+    console.log(`Cleared ${keysToRemove.length} expired cache entries`);
+  } catch (error) {
+    console.error("Error in clearOldCache:", error);
   }
 }
 
@@ -996,6 +1022,42 @@ function Deconstructor({ word }: { word?: string }) {
   const plausible = usePlausible();
   const [, setShowSimilar] = useAtom(showSimilarAtom);
   const [, setInputValue] = useAtom(inputValueAtom);
+  const [urlLoadAttempted, setUrlLoadAttempted] = useState(false);
+
+  // Add a function to handle browser navigation events
+  function setupBrowserNavigation() {
+    if (typeof window === "undefined") return;
+
+    // Define the handler function
+    const handlePopState = (event: PopStateEvent) => {
+      console.log("Navigation event detected", window.location.pathname);
+
+      // Check if we're on a word page
+      const match = window.location.pathname.match(/\/word\/([^/]+)/);
+      if (match) {
+        const word = decodeURIComponent(match[1]);
+        console.log("Detected navigation to word:", word);
+
+        // We don't call handleWordSubmit directly here because
+        // the component will handle it via its useEffect
+        setUrlLoadAttempted(false); // Reset to allow loading the word
+      }
+    };
+
+    // Add the event listener
+    window.addEventListener("popstate", handlePopState);
+
+    // Return a cleanup function
+    return () => {
+      window.removeEventListener("popstate", handlePopState);
+    };
+  }
+
+  // Call this function when the component mounts
+  useEffect(() => {
+    const cleanup = setupBrowserNavigation();
+    return cleanup;
+  }, []);
 
   const handleWordSubmit = async (word: string) => {
     if (!word.trim()) return;
@@ -1004,7 +1066,7 @@ function Deconstructor({ word }: { word?: string }) {
     if (typeof window !== "undefined") {
       const normalizedWord = normalizeWord(word);
       const url = `/word/${encodeURIComponent(normalizedWord)}`;
-      window.history.pushState({}, "", url);
+      window.history.pushState({ word: normalizedWord }, "", url);
     }
 
     // Rest of the existing handleWordSubmit function
@@ -1019,6 +1081,8 @@ function Deconstructor({ word }: { word?: string }) {
     if (cached) {
       console.log("Using cached data for:", word);
       setDefinition(cached);
+      setIsLoading(false);
+      addToSearchHistory(word);
       toast.success("Retrieved from cache", { duration: 2000 });
       return;
     }
@@ -1039,6 +1103,7 @@ function Deconstructor({ word }: { word?: string }) {
           description: `You get ${MAX_CREDITS} credits every 6 hours. Next refresh in ~${hoursLeft} hours.`,
         }
       );
+      setIsLoading(false);
       return;
     }
 
@@ -1072,8 +1137,17 @@ function Deconstructor({ word }: { word?: string }) {
       // Only cache and update state if we have valid data
       setDefinition(validatedData);
       incrementCreditsUsed();
-      window.dispatchEvent(new Event("credits_updated"));
+
+      // Use a safer way to dispatch the event
+      try {
+        const event = new Event("credits_updated");
+        window.dispatchEvent(event);
+      } catch (error) {
+        console.error("Error dispatching credits_updated event:", error);
+      }
+
       cacheWord(word, validatedData);
+      addToSearchHistory(word);
 
       plausible("deconstruct", {
         props: {
@@ -1103,9 +1177,27 @@ function Deconstructor({ word }: { word?: string }) {
     }
   };
 
+  // Separate effect for URL-based word loading
+  useEffect(() => {
+    if (word && !urlLoadAttempted) {
+      setUrlLoadAttempted(true);
+      handleWordSubmit(word).catch((error) => {
+        console.error("Error loading word from URL:", error);
+        setIsLoading(false);
+        toast.error(
+          "Failed to load word from URL. Please try searching again.",
+          {
+            duration: 5000,
+          }
+        );
+      });
+    }
+  }, [word, urlLoadAttempted]);
+
+  // Reset URL load attempted when word changes
   useEffect(() => {
     if (word) {
-      handleWordSubmit(word);
+      setUrlLoadAttempted(false);
     }
   }, [word]);
 
