@@ -1002,13 +1002,23 @@ function Deconstructor({ word }: { word?: string }) {
   const [isLoading, setIsLoading] = useAtom(isLoadingAtom);
   const [definition, setDefinition] = useState<Definition>(defaultDefinition);
   const plausible = usePlausible();
+  const [showSimilar, setShowSimilar] = useAtom(showSimilarAtom);
+  const [inputValue, setInputValue] = useAtom(inputValueAtom);
 
   const handleWordSubmit = async (word: string) => {
-    console.log("handleWordSubmit", word);
-    if (!word.trim()) {
-      toast.error("Please enter a word");
-      return;
+    if (!word.trim()) return;
+
+    // Update URL for better SEO and sharing
+    if (typeof window !== "undefined") {
+      const normalizedWord = normalizeWord(word);
+      const url = `/word/${encodeURIComponent(normalizedWord)}`;
+      window.history.pushState({}, "", url);
     }
+
+    // Rest of the existing handleWordSubmit function
+    setIsLoading(true);
+    setShowSimilar(false);
+    setInputValue(word);
 
     const normalizedWord = normalizeWord(word);
 
@@ -1041,7 +1051,6 @@ function Deconstructor({ word }: { word?: string }) {
     }
 
     try {
-      setIsLoading(true);
       const response = await fetch("/api", {
         method: "POST",
         body: JSON.stringify({ word }),

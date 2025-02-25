@@ -13,15 +13,19 @@ const notoSerif = Noto_Serif({
 });
 
 export const metadata: Metadata = {
-  title: "Etymon.ai",
-  description: "Understand the origins of words",
+  title: "Etymon.ai - Understand the Origins of Words",
+  description:
+    "Explore the etymology and origins of words with Etymon.ai. Discover the historical roots, meanings, and evolution of any word in an interactive visual format.",
+  keywords:
+    "etymology, word origins, language history, word meaning, linguistics, word roots, etymology tool, word etymology",
   icons: {
     icon: "/favicon.png",
   },
   openGraph: {
-    title: "Etymon.ai",
+    title: "Etymon.ai - Understand the Origins of Words",
     siteName: "Etymon.ai",
-    description: "Understand the origins of words",
+    description:
+      "Explore the etymology and origins of words with Etymon.ai. Discover the historical roots, meanings, and evolution of any word in an interactive visual format.",
     images: [
       {
         url: "/og.png",
@@ -32,14 +36,21 @@ export const metadata: Metadata = {
     ],
     locale: "en_US",
     type: "website",
+    url: "https://etymon.rumiallbert.com",
   },
   twitter: {
     card: "summary_large_image",
-    title: "Etymon.ai",
-    description: "Understand the origins of words",
+    title: "Etymon.ai - Understand the Origins of Words",
+    description:
+      "Explore the etymology and origins of words with Etymon.ai. Discover the historical roots, meanings, and evolution of any word in an interactive visual format.",
     images: ["/og.png"],
     creator: "@rumiallbert",
+    site: "@rumiallbert",
   },
+  alternates: {
+    canonical: "https://etymon.rumiallbert.com",
+  },
+  metadataBase: new URL("https://etymon.rumiallbert.com"),
 };
 
 export default function RootLayout({
@@ -51,6 +62,8 @@ export default function RootLayout({
     <html lang="en" suppressHydrationWarning>
       <head>
         <GoogleAnalytics />
+        <link rel="manifest" href="/manifest.json" />
+        <meta name="theme-color" content="#000000" />
       </head>
       <body className={notoSerif.className} suppressHydrationWarning>
         <ThemeProvider
