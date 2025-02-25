@@ -96,18 +96,10 @@ function getCreditsUsed(): number {
 }
 
 function incrementCreditsUsed() {
-  if (typeof window === "undefined") return;
   const current = getCreditsUsed();
   localStorage.setItem(CREDITS_KEY, (current + 1).toString());
   localStorage.setItem(CREDITS_TIMESTAMP_KEY, Date.now().toString());
 }
-
-type Combination = {
-  id: string;
-  text: string;
-  definition: string;
-  sourceIds: string[];
-};
 
 const WordChunkNode = ({
   data,
@@ -999,11 +991,11 @@ const CreditsCounter = () => {
 };
 
 function Deconstructor({ word }: { word?: string }) {
-  const [isLoading, setIsLoading] = useAtom(isLoadingAtom);
+  const [, setIsLoading] = useAtom(isLoadingAtom);
   const [definition, setDefinition] = useState<Definition>(defaultDefinition);
   const plausible = usePlausible();
-  const [showSimilar, setShowSimilar] = useAtom(showSimilarAtom);
-  const [inputValue, setInputValue] = useAtom(inputValueAtom);
+  const [, setShowSimilar] = useAtom(showSimilarAtom);
+  const [, setInputValue] = useAtom(inputValueAtom);
 
   const handleWordSubmit = async (word: string) => {
     if (!word.trim()) return;

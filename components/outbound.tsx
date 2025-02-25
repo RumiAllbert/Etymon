@@ -46,7 +46,6 @@ function CoffeeButton() {
     if (showTooltip && tooltipRef.current && containerRef.current) {
       const tooltipRect = tooltipRef.current.getBoundingClientRect();
       const containerRect = containerRef.current.getBoundingClientRect();
-      const viewportWidth = window.innerWidth;
 
       // If tooltip would be cut off on the left, position it to the right
       if (containerRect.left < tooltipRect.width / 2) {
