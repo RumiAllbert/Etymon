@@ -333,6 +333,7 @@ const HistoryPanel = ({
   const handleClick = async (word: string) => {
     if (isLoading) return;
     try {
+      setShowHistory(false); // Close the panel when a word is clicked
       await onWordClick(word);
       setInputValue("");
     } catch (error) {
@@ -406,8 +407,8 @@ const HistoryPanel = ({
   return (
     <div className="fixed right-4 left-4 md:left-auto md:w-96 top-20 dark:bg-gray-800/90 bg-white/90 backdrop-blur-sm dark:border-gray-700/50 border-gray-200/50 border rounded-xl p-4 md:p-6 transition-all duration-1000 shadow-2xl z-50 max-h-[80vh] flex flex-col">
       <div className="flex justify-between items-center mb-4">
-        <h2 className="text-xl font-serif">Recent Searches</h2>
-        <div className="flex gap-2">
+        <div className="flex items-center gap-4">
+          <h2 className="text-xl font-serif">Recent Searches</h2>
           <button
             onClick={clearHistory}
             className="opacity-50 hover:opacity-100 transition-opacity"
@@ -429,26 +430,26 @@ const HistoryPanel = ({
               <path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2" />
             </svg>
           </button>
-          <button
-            onClick={() => setShowHistory(false)}
-            className="opacity-50 hover:opacity-100 transition-opacity"
-          >
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              width="24"
-              height="24"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            >
-              <line x1="18" y1="6" x2="6" y2="18" />
-              <line x1="6" y1="6" x2="18" y2="18" />
-            </svg>
-          </button>
         </div>
+        <button
+          onClick={() => setShowHistory(false)}
+          className="opacity-50 hover:opacity-100 transition-opacity"
+        >
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            width="24"
+            height="24"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          >
+            <line x1="18" y1="6" x2="6" y2="18" />
+            <line x1="6" y1="6" x2="18" y2="18" />
+          </svg>
+        </button>
       </div>
 
       <div className="mb-4 sticky top-0">
