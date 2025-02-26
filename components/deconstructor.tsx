@@ -31,7 +31,7 @@ const CREDITS_KEY = "etymon_credits_used";
 const CREDITS_TIMESTAMP_KEY = "etymon_credits_timestamp";
 const CREDITS_INTERVAL = 6 * 60 * 60 * 1000; // 6 hours in milliseconds
 const CACHE_PREFIX = "etymon_cache_";
-const CACHE_EXPIRY = 30 * 60 * 1000; // 30 minutes in milliseconds
+const CACHE_EXPIRY = 60 * 60 * 1000; // 60 minutes in milliseconds
 const HISTORY_KEY = "etymon_search_history";
 const MAX_HISTORY_ITEMS = 10;
 
@@ -671,14 +671,26 @@ function normalizeWord(word: string): string {
 function getCachedWord(word: string): Definition | null {
   if (typeof window === "undefined") return null;
 
-  const normalizedSearchWord = normalizeWord(word);
-  const cacheKey = CACHE_PREFIX + normalizedSearchWord;
-  const cached = localStorage.getItem(cacheKey);
-
-  if (!cached) return null;
-
   try {
-    const { data, timestamp, originalWord } = JSON.parse(cached);
+    const normalizedSearchWord = normalizeWord(word);
+    const cacheKey = CACHE_PREFIX + normalizedSearchWord;
+    const cached = localStorage.getItem(cacheKey);
+
+    if (!cached) {
+      console.log("No cache found for:", word);
+      return null;
+    }
+
+    let parsedCache;
+    try {
+      parsedCache = JSON.parse(cached);
+    } catch (error) {
+      console.error("Failed to parse cached data:", error);
+      localStorage.removeItem(cacheKey);
+      return null;
+    }
+
+    const { data, timestamp, originalWord } = parsedCache;
 
     // Check if cache has expired
     if (Date.now() - timestamp > CACHE_EXPIRY) {
@@ -697,6 +709,55 @@ function getCachedWord(word: string): Definition | null {
     // Validate the cached data against the schema
     try {
       const validatedData = wordSchema.parse(data);
+
+      // Additional validation for required fields and their structure
+      if (
+        !validatedData.parts?.length ||
+        !validatedData.combinations?.length ||
+        !validatedData.similarWords?.length ||
+        !validatedData.thought
+      ) {
+        console.error("Missing required fields or empty arrays in cached data");
+        localStorage.removeItem(cacheKey);
+        return null;
+      }
+
+      // Validate parts structure
+      const validParts = validatedData.parts.every(
+        (part) =>
+          part.id &&
+          part.text &&
+          part.originalWord &&
+          part.origin &&
+          part.meaning
+      );
+
+      // Validate combinations structure
+      const validCombinations = validatedData.combinations.every(
+        (layer) =>
+          layer.length > 0 &&
+          layer.every(
+            (combo) =>
+              combo.id &&
+              combo.text &&
+              combo.definition &&
+              Array.isArray(combo.sourceIds) &&
+              combo.sourceIds.length > 0
+          )
+      );
+
+      // Validate similar words structure
+      const validSimilarWords = validatedData.similarWords.every(
+        (word) => word.word && word.explanation && word.sharedOrigin
+      );
+
+      if (!validParts || !validCombinations || !validSimilarWords) {
+        console.error("Invalid structure in cached data fields");
+        localStorage.removeItem(cacheKey);
+        return null;
+      }
+
+      console.log("Successfully validated cached data for:", word);
       return validatedData;
     } catch (error) {
       console.error("Invalid cached data schema:", error);
@@ -704,8 +765,9 @@ function getCachedWord(word: string): Definition | null {
       return null;
     }
   } catch (error) {
-    console.error("Error parsing cached data:", error);
-    localStorage.removeItem(cacheKey);
+    console.error("Error reading cache:", error);
+    // Clear all potentially corrupted cache entries
+    clearCorruptedCache();
     return null;
   }
 }
@@ -717,37 +779,81 @@ function cacheWord(word: string, data: Definition) {
     const normalizedWord = normalizeWord(word);
     const cacheKey = CACHE_PREFIX + normalizedWord;
 
+    // Clear existing cache for this word
+    localStorage.removeItem(cacheKey);
+
     // Validate data before caching
     try {
-      wordSchema.parse(data);
-    } catch (error) {
-      console.error("Invalid data schema for caching:", error);
-      return;
-    }
+      const validatedData = wordSchema.parse(data);
+      // Additional validation for required fields
+      if (
+        !validatedData.parts ||
+        !validatedData.combinations ||
+        !validatedData.similarWords
+      ) {
+        throw new Error("Missing required fields in data to be cached");
+      }
 
-    const cacheData = {
-      data,
-      timestamp: Date.now(),
-      originalWord: word,
-    };
+      const cacheData = {
+        data: validatedData,
+        timestamp: Date.now(),
+        originalWord: word,
+      };
 
-    try {
       localStorage.setItem(cacheKey, JSON.stringify(cacheData));
       console.log("Successfully cached word:", word);
     } catch (error) {
-      console.error("Error caching word data:", error);
-      // If storage fails, try to clear old cache entries
-      try {
-        clearOldCache();
-        // Try one more time after clearing old entries
-        localStorage.setItem(cacheKey, JSON.stringify(cacheData));
-        console.log("Successfully cached word after clearing old cache:", word);
-      } catch (e) {
-        console.error("Error clearing old cache:", e);
-      }
+      console.error("Invalid data for caching:", error);
+      return;
     }
   } catch (error) {
-    console.error("Unexpected error in cacheWord:", error);
+    console.error("Error caching word:", error);
+    // If storage fails, try to clear old cache entries
+    try {
+      clearOldCache();
+    } catch (e) {
+      console.error("Error clearing old cache:", e);
+    }
+  }
+}
+
+function clearCorruptedCache() {
+  if (typeof window === "undefined") return;
+
+  try {
+    const keysToRemove = [];
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i);
+      if (key && key.startsWith(CACHE_PREFIX)) {
+        try {
+          const cached = localStorage.getItem(key);
+          if (cached) {
+            const { data } = JSON.parse(cached);
+            // Try to validate the data
+            wordSchema.parse(data);
+          }
+        } catch (e) {
+          // If we can't parse or validate, mark for removal
+          keysToRemove.push(key);
+        }
+      }
+    }
+
+    // Remove corrupted entries
+    keysToRemove.forEach((key) => {
+      try {
+        localStorage.removeItem(key);
+        console.log("Removed corrupted cache entry:", key);
+      } catch (e) {
+        console.error("Error removing corrupted cache key:", key, e);
+      }
+    });
+
+    if (keysToRemove.length > 0) {
+      console.log(`Cleared ${keysToRemove.length} corrupted cache entries`);
+    }
+  } catch (error) {
+    console.error("Error in clearCorruptedCache:", error);
   }
 }
 
@@ -771,22 +877,27 @@ function clearOldCache() {
             }
           }
         } catch (e) {
-          // If we can't parse this item, it's probably corrupted, so remove it
+          // If we can't parse this item, mark it for removal
           keysToRemove.push(key);
         }
       }
     }
 
-    // Remove expired keys
+    // Remove expired or corrupted keys
     keysToRemove.forEach((key) => {
       try {
         localStorage.removeItem(key);
+        console.log("Removed expired/corrupted cache entry:", key);
       } catch (e) {
-        console.error("Error removing key:", key, e);
+        console.error("Error removing cache key:", key, e);
       }
     });
 
-    console.log(`Cleared ${keysToRemove.length} expired cache entries`);
+    if (keysToRemove.length > 0) {
+      console.log(
+        `Cleared ${keysToRemove.length} expired/corrupted cache entries`
+      );
+    }
   } catch (error) {
     console.error("Error in clearOldCache:", error);
   }
@@ -1062,29 +1173,41 @@ function Deconstructor({ word }: { word?: string }) {
   const handleWordSubmit = async (word: string) => {
     if (!word.trim()) return;
 
+    // Reset states at the start of a new search
+    setShowSimilar(false);
+    setIsLoading(true);
+    setInputValue(word);
+
+    const normalizedWord = normalizeWord(word);
+
     // Update URL for better SEO and sharing
     if (typeof window !== "undefined") {
-      const normalizedWord = normalizeWord(word);
       const url = `/word/${encodeURIComponent(normalizedWord)}`;
       window.history.pushState({ word: normalizedWord }, "", url);
     }
 
-    // Rest of the existing handleWordSubmit function
-    setIsLoading(true);
-    setShowSimilar(false);
-    setInputValue(word);
-
-    const normalizedWord = normalizeWord(word);
+    const cacheKey = CACHE_PREFIX + normalizedWord;
 
     // Check cache first
     const cached = getCachedWord(word);
     if (cached) {
       console.log("Using cached data for:", word);
-      setDefinition(cached);
-      setIsLoading(false);
-      addToSearchHistory(word);
-      toast.success("Retrieved from cache", { duration: 2000 });
-      return;
+      try {
+        // Double-check the cached data is valid
+        wordSchema.parse(cached);
+        if (!cached.parts || !cached.combinations || !cached.similarWords) {
+          throw new Error("Missing required fields in cached data");
+        }
+        setDefinition(cached);
+        addToSearchHistory(word);
+        toast.success("Retrieved from cache", { duration: 2000 });
+        setIsLoading(false);
+        return;
+      } catch (error) {
+        console.error("Invalid cached data:", error);
+        localStorage.removeItem(cacheKey);
+        // Continue with API call since cache was invalid
+      }
     }
 
     const creditsUsed = getCreditsUsed();
@@ -1118,6 +1241,7 @@ function Deconstructor({ word }: { word?: string }) {
 
       const responseData = await response.json();
 
+      // Handle non-200 responses (except 203 which is partial success)
       if (!response.ok && response.status !== 203) {
         throw new Error(responseData.error || "Failed to process word");
       }
@@ -1146,6 +1270,7 @@ function Deconstructor({ word }: { word?: string }) {
         console.error("Error dispatching credits_updated event:", error);
       }
 
+      // Only cache and add to history if we have valid data
       cacheWord(word, validatedData);
       addToSearchHistory(word);
 
@@ -1161,6 +1286,9 @@ function Deconstructor({ word }: { word?: string }) {
         },
       });
 
+      // Reset the definition to default on error
+      setDefinition(defaultDefinition);
+
       const message =
         error instanceof Error
           ? error.message
@@ -1170,7 +1298,6 @@ function Deconstructor({ word }: { word?: string }) {
       });
 
       // Clear any potentially corrupted cache for this word
-      const cacheKey = CACHE_PREFIX + normalizedWord;
       localStorage.removeItem(cacheKey);
     } finally {
       setIsLoading(false);
