@@ -1,21 +1,47 @@
 {
-  "name": "Etymon.ai - Word Etymology Explorer",
+  "name": "Etymon.ai - Discover the Origin of Words",
   "short_name": "Etymon.ai",
-  "description": "Explore the etymology and origins of words with Etymon.ai",
+  "description": "Uncover the fascinating origins and meanings of words with our interactive visual etymology explorer. Perfect for language enthusiasts and curious minds.",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#000000",
   "theme_color": "#000000",
+  "orientation": "portrait",
+  "categories": ["education", "reference", "utilities"],
   "icons": [
     {
       "src": "/favicon.png",
-      "sizes": "192x192",
+      "sizes": "32x32",
       "type": "image/png"
     },
     {
       "src": "/favicon.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/favicon.png",
       "sizes": "512x512",
-      "type": "image/png"
+      "type": "image/png",
+      "purpose": "any maskable"
     }
-  ]
+  ],
+  "screenshots": [
+    {
+      "src": "/og.png",
+      "sizes": "1200x630",
+      "type": "image/png",
+      "label": "Etymon.ai - Interactive Word Etymology Explorer"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Search Word Origin",
+      "url": "/",
+      "description": "Search for a word's etymology"
+    }
+  ],
+  "lang": "en",
+  "dir": "ltr"
 }
