@@ -16,7 +16,10 @@ const customJestConfig = {
     '^@/utils/(.*)$': '<rootDir>/utils/$1',
   },
   // Ignore Next.js build directory
-  testPathIgnorePatterns: ['<rootDir>/.next/'],
+  testPathIgnorePatterns: [
+    '<rootDir>/.next/',
+    '<rootDir>/babel.config.test.js'
+  ],
   transform: {
     // Use babel-jest to transpile tests with the next/babel preset
     '^.+\\.(js|jsx|ts|tsx)$': ['babel-jest', { configFile: './babel.config.test.js' }],

@@ -30,14 +30,16 @@ const MAX_CREDITS = 15;
 const CREDITS_KEY = "etymon_credits_used";
 const CREDITS_TIMESTAMP_KEY = "etymon_credits_timestamp";
 const CREDITS_INTERVAL = 6 * 60 * 60 * 1000; // 6 hours in milliseconds
-const CACHE_PREFIX = "etymon_cache_";
+export const CACHE_PREFIX = "etymon_cache_";
 const CACHE_EXPIRY = 60 * 60 * 1000; // 60 minutes in milliseconds
-const HISTORY_KEY = "etymon_search_history";
+export const HISTORY_KEY = "etymon_search_history";
 const MAX_HISTORY_ITEMS = 10;
 
 type SearchHistoryItem = {
   word: string;
   timestamp: number;
+  meaning?: string;
+  origin?: string;
 };
 
 function getSearchHistory(): SearchHistoryItem[] {
@@ -51,25 +53,43 @@ function getSearchHistory(): SearchHistoryItem[] {
   }
 }
 
-function addToSearchHistory(word: string) {
+function addToSearchHistory(word: string, definition?: Definition) {
   if (typeof window === "undefined") return;
   try {
     const history = getSearchHistory();
     const normalizedWord = normalizeWord(word);
 
-    // Remove existing entry of the same word if it exists
-    const filteredHistory = history.filter(
-      (item) => normalizeWord(item.word) !== normalizedWord
+    // Find existing entry
+    const existingIndex = history.findIndex(
+      (item) => normalizeWord(item.word) === normalizedWord
     );
 
+    const newEntry: SearchHistoryItem = {
+      word,
+      timestamp: Date.now(),
+      meaning: definition?.thought || "",
+      origin: definition?.parts?.[0]?.origin || "",
+    };
+
+    if (existingIndex !== -1) {
+      // If we don't have new definition data, preserve the old data
+      if (!definition) {
+        newEntry.meaning = history[existingIndex].meaning;
+        newEntry.origin = history[existingIndex].origin;
+      }
+      history.splice(existingIndex, 1);
+    }
+
     // Add new entry at the beginning
-    const newHistory = [
-      { word, timestamp: Date.now() },
-      ...filteredHistory,
-    ].slice(0, MAX_HISTORY_ITEMS); // Keep only the latest 10 items
+    const newHistory = [newEntry, ...history].slice(0, MAX_HISTORY_ITEMS);
 
     localStorage.setItem(HISTORY_KEY, JSON.stringify(newHistory));
-    console.log("Updated search history with:", word);
+    console.log(
+      "Updated search history with:",
+      word,
+      "definition:",
+      !!definition
+    );
   } catch (error) {
     console.error("Error updating search history:", error);
   }
@@ -306,12 +326,13 @@ const HistoryPanel = ({
   const [isLoading] = useAtom(isLoadingAtom);
   const [showHistory, setShowHistory] = useAtom(showHistoryAtom);
   const [, setInputValue] = useAtom(inputValueAtom);
+  const [searchTerm, setSearchTerm] = useState("");
+  const [expandedItems, setExpandedItems] = useState<Set<string>>(new Set());
   const history = getSearchHistory();
 
   const handleClick = async (word: string) => {
     if (isLoading) return;
     try {
-      setShowHistory(false);
       await onWordClick(word);
       setInputValue("");
     } catch (error) {
@@ -320,48 +341,218 @@ const HistoryPanel = ({
     }
   };
 
+  const toggleItemExpanded = (word: string) => {
+    setExpandedItems((prev) => {
+      const next = new Set(prev);
+      if (next.has(word)) {
+        next.delete(word);
+      } else {
+        next.add(word);
+      }
+      return next;
+    });
+  };
+
+  const clearHistory = () => {
+    if (typeof window === "undefined") return;
+    localStorage.removeItem(HISTORY_KEY);
+    setShowHistory(false);
+    toast.success("Search history cleared");
+  };
+
+  const groupHistoryByDate = (items: SearchHistoryItem[]) => {
+    const groups: { [key: string]: SearchHistoryItem[] } = {
+      Today: [],
+      Yesterday: [],
+      "This Week": [],
+      "This Month": [],
+      Earlier: [],
+    };
+
+    const now = new Date();
+    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const yesterday = new Date(today);
+    yesterday.setDate(yesterday.getDate() - 1);
+    const thisWeek = new Date(today);
+    thisWeek.setDate(thisWeek.getDate() - 7);
+    const thisMonth = new Date(today);
+    thisMonth.setMonth(thisMonth.getMonth() - 1);
+
+    items.forEach((item) => {
+      const date = new Date(item.timestamp);
+      if (date >= today) {
+        groups.Today.push(item);
+      } else if (date >= yesterday) {
+        groups.Yesterday.push(item);
+      } else if (date >= thisWeek) {
+        groups["This Week"].push(item);
+      } else if (date >= thisMonth) {
+        groups["This Month"].push(item);
+      } else {
+        groups.Earlier.push(item);
+      }
+    });
+
+    return groups;
+  };
+
+  const filteredHistory = history.filter((item) =>
+    item.word.toLowerCase().includes(searchTerm.toLowerCase())
+  );
+  const groupedHistory = groupHistoryByDate(filteredHistory);
+
   if (!showHistory || history.length === 0) return null;
 
   return (
-    <div className="fixed right-4 top-20 w-96 dark:bg-gray-800/90 bg-white/90 backdrop-blur-sm dark:border-gray-700/50 border-gray-200/50 border rounded-xl p-6 transition-all duration-1000 shadow-2xl z-50">
+    <div className="fixed right-4 left-4 md:left-auto md:w-96 top-20 dark:bg-gray-800/90 bg-white/90 backdrop-blur-sm dark:border-gray-700/50 border-gray-200/50 border rounded-xl p-4 md:p-6 transition-all duration-1000 shadow-2xl z-50 max-h-[80vh] flex flex-col">
       <div className="flex justify-between items-center mb-4">
         <h2 className="text-xl font-serif">Recent Searches</h2>
-        <button
-          onClick={() => setShowHistory(false)}
-          className="opacity-50 hover:opacity-100 transition-opacity"
-        >
-          <svg
-            xmlns="http://www.w3.org/2000/svg"
-            width="24"
-            height="24"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2"
-            strokeLinecap="round"
-            strokeLinejoin="round"
+        <div className="flex gap-2">
+          <button
+            onClick={clearHistory}
+            className="opacity-50 hover:opacity-100 transition-opacity"
+            title="Clear history"
           >
-            <line x1="18" y1="6" x2="6" y2="18" />
-            <line x1="6" y1="6" x2="18" y2="18" />
-          </svg>
-        </button>
-      </div>
-      <div className="space-y-2">
-        {history.map((item, i) => (
-          <div key={i} className="flex justify-between items-center">
-            <button
-              type="button"
-              onClick={() => handleClick(item.word)}
-              disabled={isLoading}
-              className="text-lg font-serif dark:text-blue-400 text-blue-600 hover:dark:text-blue-300 hover:text-blue-500 transition-colors text-left disabled:opacity-50 disabled:cursor-not-allowed"
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              width="20"
+              height="20"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
             >
-              {item.word}
-            </button>
-            <span className="text-xs dark:text-gray-400 text-gray-500">
-              {new Date(item.timestamp).toLocaleDateString()}
-            </span>
-          </div>
-        ))}
+              <path d="M3 6h18" />
+              <path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6" />
+              <path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2" />
+            </svg>
+          </button>
+          <button
+            onClick={() => setShowHistory(false)}
+            className="opacity-50 hover:opacity-100 transition-opacity"
+          >
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              width="24"
+              height="24"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
+              <line x1="18" y1="6" x2="6" y2="18" />
+              <line x1="6" y1="6" x2="18" y2="18" />
+            </svg>
+          </button>
+        </div>
+      </div>
+
+      <div className="mb-4 sticky top-0">
+        <input
+          type="text"
+          placeholder="Search history..."
+          value={searchTerm}
+          onChange={(e) => setSearchTerm(e.target.value)}
+          className="w-full px-3 py-2 rounded-lg dark:bg-gray-900/50 bg-gray-50/50 dark:border-gray-700/50 border-gray-200/50 border dark:text-gray-100 text-gray-900 dark:placeholder-gray-500 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500/50"
+        />
+      </div>
+
+      <div className="space-y-6 overflow-y-auto flex-1 pr-2">
+        {Object.entries(groupedHistory).map(([group, items]) =>
+          items.length > 0 ? (
+            <div key={group}>
+              <h3 className="text-sm font-medium dark:text-gray-400 text-gray-500 mb-2">
+                {group}
+              </h3>
+              <div className="space-y-2">
+                {items.map((item, i) => {
+                  const isExpanded = expandedItems.has(item.word);
+                  return (
+                    <div
+                      key={i}
+                      className="p-3 rounded-lg dark:bg-gray-900/50 bg-gray-50/50 space-y-2"
+                    >
+                      <div className="flex justify-between items-center gap-2">
+                        <button
+                          type="button"
+                          onClick={() => handleClick(item.word)}
+                          disabled={isLoading}
+                          className="text-lg font-serif dark:text-blue-400 text-blue-600 hover:dark:text-blue-300 hover:text-blue-500 transition-colors text-left disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                          {item.word}
+                        </button>
+                        <button
+                          onClick={() => toggleItemExpanded(item.word)}
+                          className={`opacity-50 hover:opacity-100 transition-opacity ${
+                            isExpanded ? "opacity-100" : ""
+                          }`}
+                          title={isExpanded ? "Show less" : "Show more"}
+                        >
+                          <svg
+                            xmlns="http://www.w3.org/2000/svg"
+                            width="20"
+                            height="20"
+                            viewBox="0 0 24 24"
+                            fill="none"
+                            stroke="currentColor"
+                            strokeWidth="2"
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            className={`transform transition-transform ${
+                              isExpanded ? "rotate-180" : ""
+                            }`}
+                          >
+                            <path d="m6 9 6 6 6-6" />
+                          </svg>
+                        </button>
+                      </div>
+                      {isExpanded && (
+                        <div className="pt-2 space-y-2 border-t dark:border-gray-700/50 border-gray-200/50">
+                          {item.origin && (
+                            <div className="flex items-center gap-2">
+                              <span className="text-xs dark:text-gray-400 text-gray-500">
+                                Origin:
+                              </span>
+                              <span
+                                className={`px-2 py-0.5 text-xs font-medium rounded-full ${getOriginColor(
+                                  item.origin
+                                )}`}
+                              >
+                                {item.origin}
+                              </span>
+                            </div>
+                          )}
+                          {item.meaning && (
+                            <div>
+                              <span className="text-xs dark:text-gray-400 text-gray-500">
+                                Meaning:
+                              </span>
+                              <p className="text-xs dark:text-gray-300 text-gray-600 mt-1">
+                                {item.meaning}
+                              </p>
+                            </div>
+                          )}
+                          <div className="flex items-center gap-2">
+                            <span className="text-xs dark:text-gray-400 text-gray-500">
+                              Last searched:
+                            </span>
+                            <span className="text-xs dark:text-gray-300 text-gray-600">
+                              {new Date(item.timestamp).toLocaleDateString()}
+                            </span>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          ) : null
+        )}
       </div>
     </div>
   );
@@ -1199,7 +1390,7 @@ function Deconstructor({ word }: { word?: string }) {
           throw new Error("Missing required fields in cached data");
         }
         setDefinition(cached);
-        addToSearchHistory(word);
+        addToSearchHistory(word, cached); // Add to history with cached data
         toast.success("Retrieved from cache", { duration: 2000 });
         setIsLoading(false);
         return;
@@ -1270,9 +1461,9 @@ function Deconstructor({ word }: { word?: string }) {
         console.error("Error dispatching credits_updated event:", error);
       }
 
-      // Only cache and add to history if we have valid data
+      // Cache the word and add to history with complete data
       cacheWord(word, validatedData);
-      addToSearchHistory(word);
+      addToSearchHistory(word, validatedData); // Add to history with complete data
 
       plausible("deconstruct", {
         props: {
