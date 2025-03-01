@@ -131,10 +131,88 @@ import WordDeconstructor, {
   HISTORY_KEY,
 } from "@/components/deconstructor";
 
+// Valid mock data for tests
+const validEnglishWordData = {
+  thought: "Test etymology for English word",
+  parts: [
+    {
+      id: "part1",
+      text: "te",
+      originalWord: "te",
+      origin: "Latin",
+      meaning: "test meaning 1",
+    },
+    {
+      id: "part2",
+      text: "st",
+      originalWord: "st",
+      origin: "Germanic",
+      meaning: "test meaning 2",
+    },
+  ],
+  combinations: [
+    [
+      {
+        id: "test",
+        text: "test",
+        definition: "A test word",
+        sourceIds: ["part1", "part2"],
+      },
+    ],
+  ],
+  similarWords: [
+    {
+      word: "testing",
+      explanation: "Related to test",
+      sharedOrigin: "Latin test",
+    },
+  ],
+};
+
+const validGreekWordData = {
+  thought:
+    "Test etymology for Greek word φιλοσοφία (philosophia) which means philosophy",
+  parts: [
+    {
+      id: "phil",
+      text: "φιλο",
+      originalWord: "φίλος",
+      origin: "Ancient Greek",
+      meaning: "loving",
+    },
+    {
+      id: "sophia",
+      text: "σοφία",
+      originalWord: "σοφία",
+      origin: "Ancient Greek",
+      meaning: "wisdom",
+    },
+  ],
+  combinations: [
+    [
+      {
+        id: "philosophia",
+        text: "Φιλοσοφία",
+        definition: "Love of wisdom",
+        sourceIds: ["phil", "sophia"],
+      },
+    ],
+  ],
+  similarWords: [
+    {
+      word: "φιλόλογος",
+      explanation: "Love of words",
+      sharedOrigin: "Greek φίλος (philos)",
+    },
+  ],
+};
+
 describe("WordDeconstructor", () => {
   beforeEach(() => {
     jest.clearAllMocks();
     mockLocalStorage.clear();
+    // Properly type the mocked fetch function
+    global.fetch = jest.fn() as jest.MockedFunction<typeof global.fetch>;
   });
 
   describe("Core Functionality", () => {
@@ -151,17 +229,10 @@ describe("WordDeconstructor", () => {
     });
 
     it("handles word submission", async () => {
-      const mockResponse = {
+      global.fetch = jest.fn().mockResolvedValue({
         ok: true,
-        json: () =>
-          Promise.resolve({
-            thought: "Test response",
-            parts: [],
-            combinations: [],
-            similarWords: [],
-          }),
-      };
-      global.fetch = jest.fn().mockResolvedValue(mockResponse);
+        json: () => Promise.resolve(validEnglishWordData),
+      }) as jest.MockedFunction<typeof global.fetch>;
 
       render(
         <Provider>
@@ -183,23 +254,45 @@ describe("WordDeconstructor", () => {
         );
       });
     });
+
+    it("handles Greek word submission", async () => {
+      global.fetch = jest.fn().mockResolvedValue({
+        ok: true,
+        json: () => Promise.resolve(validGreekWordData),
+      }) as jest.MockedFunction<typeof global.fetch>;
+
+      render(
+        <Provider>
+          <WordDeconstructor />
+        </Provider>
+      );
+
+      const input = screen.getByTestId("word-input");
+      const form = input.closest("form");
+
+      fireEvent.change(input, { target: { value: "philosophy" } });
+      fireEvent.submit(form);
+
+      await waitFor(() => {
+        expect(global.fetch).toHaveBeenCalled();
+        const fetchCall = (
+          global.fetch as jest.MockedFunction<typeof global.fetch>
+        ).mock.calls[0];
+        expect(JSON.parse(fetchCall[1].body as string).word).toBe("philosophy");
+      });
+    });
   });
 
   describe("Caching", () => {
-    const mockCachedData = {
-      data: {
-        thought: "Test thought",
-        parts: [],
-        combinations: [],
-        similarWords: [],
-      },
-      timestamp: Date.now(),
-      originalWord: "test",
-    };
+    it("uses cached data when available for English words", async () => {
+      const mockCachedData = {
+        data: validEnglishWordData,
+        timestamp: Date.now(),
+        originalWord: "test",
+      };
 
-    it("uses cached data when available", async () => {
       mockLocalStorage.getItem.mockImplementation((key) => {
-        if (key.startsWith(CACHE_PREFIX)) {
+        if (key === `${CACHE_PREFIX}test`) {
           return JSON.stringify(mockCachedData);
         }
         return null;
@@ -218,11 +311,79 @@ describe("WordDeconstructor", () => {
         );
       });
     });
+
+    it("uses cached data when available for Greek words", async () => {
+      const mockCachedData = {
+        data: validGreekWordData,
+        timestamp: Date.now(),
+        originalWord: "philosophy",
+      };
+
+      mockLocalStorage.getItem.mockImplementation((key) => {
+        if (key === `${CACHE_PREFIX}philosophy`) {
+          return JSON.stringify(mockCachedData);
+        }
+        return null;
+      });
+
+      render(
+        <Provider>
+          <WordDeconstructor word="philosophy" />
+        </Provider>
+      );
+
+      await waitFor(() => {
+        expect(toast.success).toHaveBeenCalledWith(
+          "Retrieved from cache",
+          expect.any(Object)
+        );
+      });
+    });
+
+    it("invalidates cache when data is corrupted", async () => {
+      const corruptedData = {
+        data: {
+          thought: "Corrupted data",
+          // Missing required fields
+        },
+        timestamp: Date.now(),
+        originalWord: "test",
+      };
+
+      mockLocalStorage.getItem.mockImplementation((key) => {
+        if (key === `${CACHE_PREFIX}test`) {
+          return JSON.stringify(corruptedData);
+        }
+        return null;
+      });
+
+      global.fetch = jest.fn().mockResolvedValue({
+        ok: true,
+        json: () => Promise.resolve(validEnglishWordData),
+      }) as jest.MockedFunction<typeof global.fetch>;
+
+      render(
+        <Provider>
+          <WordDeconstructor word="test" />
+        </Provider>
+      );
+
+      await waitFor(() => {
+        expect(mockLocalStorage.removeItem).toHaveBeenCalledWith(
+          `${CACHE_PREFIX}test`
+        );
+        expect(global.fetch).toHaveBeenCalled();
+      });
+    });
   });
 
   describe("Error Handling", () => {
     it("handles API errors gracefully", async () => {
-      global.fetch = jest.fn().mockRejectedValue(new Error("API Error"));
+      global.fetch = jest
+        .fn()
+        .mockRejectedValue(new Error("API Error")) as jest.MockedFunction<
+        typeof global.fetch
+      >;
 
       render(
         <Provider>
@@ -237,6 +398,98 @@ describe("WordDeconstructor", () => {
       fireEvent.submit(form);
 
       await waitFor(() => {
+        expect(toast.error).toHaveBeenCalled();
+      });
+    });
+
+    it("handles non-200 API responses", async () => {
+      global.fetch = jest.fn().mockResolvedValue({
+        ok: false,
+        status: 500,
+        json: () => Promise.resolve({ error: "Server error" }),
+      }) as jest.MockedFunction<typeof global.fetch>;
+
+      render(
+        <Provider>
+          <WordDeconstructor />
+        </Provider>
+      );
+
+      const input = screen.getByTestId("word-input");
+      const form = input.closest("form");
+
+      fireEvent.change(input, { target: { value: "error" } });
+      fireEvent.submit(form);
+
+      await waitFor(() => {
+        expect(toast.error).toHaveBeenCalled();
+      });
+    });
+  });
+
+  describe("Greek Word Handling", () => {
+    it("applies flexible validation for Greek words", async () => {
+      // Create a Greek word response where the final word doesn't match the search term
+      // but the thought field mentions the search term
+      const greekResponse = {
+        ...validGreekWordData,
+        thought: "Test etymology for the word philosophy (φιλοσοφία)",
+      };
+
+      global.fetch = jest.fn().mockResolvedValue({
+        ok: true,
+        json: () => Promise.resolve(greekResponse),
+      }) as jest.MockedFunction<typeof global.fetch>;
+
+      render(
+        <Provider>
+          <WordDeconstructor />
+        </Provider>
+      );
+
+      const input = screen.getByTestId("word-input");
+      const form = input.closest("form");
+
+      fireEvent.change(input, { target: { value: "philosophy" } });
+      fireEvent.submit(form);
+
+      await waitFor(() => {
+        expect(global.fetch).toHaveBeenCalled();
+        // The response should be accepted despite the mismatch between "philosophy" and "Φιλοσοφία"
+        expect(mockLocalStorage.setItem).toHaveBeenCalledWith(
+          expect.stringContaining(CACHE_PREFIX),
+          expect.any(String)
+        );
+      });
+    });
+
+    it("rejects Greek words when thought field doesn't mention search term", async () => {
+      // Create a Greek word response where the final word doesn't match the search term
+      // and the thought field doesn't mention the search term
+      const invalidGreekResponse = {
+        ...validGreekWordData,
+        thought: "Test etymology for an unrelated word", // Doesn't mention "philosophy"
+      };
+
+      global.fetch = jest.fn().mockResolvedValue({
+        ok: true,
+        json: () => Promise.resolve(invalidGreekResponse),
+      }) as jest.MockedFunction<typeof global.fetch>;
+
+      render(
+        <Provider>
+          <WordDeconstructor />
+        </Provider>
+      );
+
+      const input = screen.getByTestId("word-input");
+      const form = input.closest("form");
+
+      fireEvent.change(input, { target: { value: "philosophy" } });
+      fireEvent.submit(form);
+
+      await waitFor(() => {
+        expect(global.fetch).toHaveBeenCalled();
         expect(toast.error).toHaveBeenCalled();
       });
     });

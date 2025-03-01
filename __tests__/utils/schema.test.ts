@@ -49,6 +49,53 @@ describe('wordSchema', () => {
     expect(result.success).toBe(true);
   });
 
+  it('should validate Greek word data with non-Latin characters', () => {
+    const greekWordData = {
+      thought: 'From Ancient Greek "φιλοσοφία" (philosophia), combining "φίλος" (philos) meaning "loving" and "σοφία" (sophia) meaning "wisdom"',
+      parts: [
+        {
+          id: 'phil',
+          text: 'Φιλο',
+          originalWord: 'φίλος',
+          origin: 'Ancient Greek',
+          meaning: 'loving, fond of',
+        },
+        {
+          id: 'sophia',
+          text: 'σοφία',
+          originalWord: 'σοφία',
+          origin: 'Ancient Greek',
+          meaning: 'wisdom, knowledge',
+        },
+      ],
+      combinations: [
+        [
+          {
+            id: 'philosophia',
+            text: 'Φιλοσοφία',
+            definition: 'the love or pursuit of wisdom and knowledge',
+            sourceIds: ['phil', 'sophia'],
+          },
+        ],
+      ],
+      similarWords: [
+        {
+          word: 'φιλόλογος',
+          explanation: 'one who loves learning/words (philology)',
+          sharedOrigin: 'Greek φίλος (philos) "loving"',
+        },
+        {
+          word: 'φιλάνθρωπος',
+          explanation: 'lover of humanity (philanthropy)',
+          sharedOrigin: 'Greek φίλος (philos) "loving"',
+        },
+      ],
+    };
+
+    const result = wordSchema.safeParse(greekWordData);
+    expect(result.success).toBe(true);
+  });
+
   it('should reject invalid data missing required fields', () => {
     const invalidData = {
       // Missing 'thought' field
