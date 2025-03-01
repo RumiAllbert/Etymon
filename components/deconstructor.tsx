@@ -35,6 +35,40 @@ const CACHE_EXPIRY = 60 * 60 * 1000; // 60 minutes in milliseconds
 export const HISTORY_KEY = "etymon_search_history";
 const MAX_HISTORY_ITEMS = 10;
 
+function clearAllCache() {
+  if (typeof window === "undefined") return;
+
+  try {
+    const keysToRemove = [];
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i);
+      if (key && key.startsWith(CACHE_PREFIX)) {
+        keysToRemove.push(key);
+      }
+    }
+
+    // Remove all cache entries
+    keysToRemove.forEach((key) => {
+      try {
+        localStorage.removeItem(key);
+        console.log("Removed cache entry:", key);
+      } catch (e) {
+        console.error("Error removing cache key:", key, e);
+      }
+    });
+
+    if (keysToRemove.length > 0) {
+      console.log(`Cleared ${keysToRemove.length} cache entries`);
+      toast.success(`Cleared ${keysToRemove.length} cached words`);
+    } else {
+      toast.info("No cached words to clear");
+    }
+  } catch (error) {
+    console.error("Error in clearAllCache:", error);
+    toast.error("Failed to clear cache");
+  }
+}
+
 type SearchHistoryItem = {
   word: string;
   timestamp: number;
@@ -428,6 +462,27 @@ const HistoryPanel = ({
               <path d="M3 6h18" />
               <path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6" />
               <path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2" />
+            </svg>
+          </button>
+          <button
+            onClick={clearAllCache}
+            className="opacity-50 hover:opacity-100 transition-opacity"
+            title="Clear all cached words"
+          >
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              width="20"
+              height="20"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
+              <rect x="2" y="4" width="20" height="16" rx="2" />
+              <path d="m10 10-2 2 2 2" />
+              <path d="m14 14 2-2-2-2" />
             </svg>
           </button>
         </div>
@@ -949,6 +1004,27 @@ function getCachedWord(word: string): Definition | null {
         return null;
       }
 
+      // Additional validation: Check if the final word in combinations matches the search word
+      const lastLayer =
+        validatedData.combinations[validatedData.combinations.length - 1];
+      if (lastLayer && lastLayer.length > 0) {
+        const finalWord = lastLayer[0].text.toLowerCase();
+        // Check if the final word is related to the search word
+        if (
+          !finalWord.includes(normalizedSearchWord) &&
+          !normalizedSearchWord.includes(finalWord)
+        ) {
+          console.error(
+            "Final word in combinations doesn't match search word:",
+            finalWord,
+            "vs",
+            normalizedSearchWord
+          );
+          localStorage.removeItem(cacheKey);
+          return null;
+        }
+      }
+
       console.log("Successfully validated cached data for:", word);
       return validatedData;
     } catch (error) {
@@ -984,6 +1060,22 @@ function cacheWord(word: string, data: Definition) {
         !validatedData.similarWords
       ) {
         throw new Error("Missing required fields in data to be cached");
+      }
+
+      // Additional validation: Check if the final word in combinations matches the search word
+      const lastLayer =
+        validatedData.combinations[validatedData.combinations.length - 1];
+      if (lastLayer && lastLayer.length > 0) {
+        const finalWord = lastLayer[0].text.toLowerCase();
+        // Check if the final word is related to the search word
+        if (
+          !finalWord.includes(normalizedWord) &&
+          !normalizedWord.includes(finalWord)
+        ) {
+          throw new Error(
+            `Final word in combinations (${finalWord}) doesn't match search word (${normalizedWord})`
+          );
+        }
       }
 
       const cacheData = {
@@ -1390,6 +1482,22 @@ function Deconstructor({ word }: { word?: string }) {
         if (!cached.parts || !cached.combinations || !cached.similarWords) {
           throw new Error("Missing required fields in cached data");
         }
+
+        // Additional validation: Check if the final word in combinations matches the search word
+        const lastLayer = cached.combinations[cached.combinations.length - 1];
+        if (lastLayer && lastLayer.length > 0) {
+          const finalWord = lastLayer[0].text.toLowerCase();
+          // Check if the final word is related to the search word
+          if (
+            !finalWord.includes(normalizedWord) &&
+            !normalizedWord.includes(finalWord)
+          ) {
+            throw new Error(
+              `Final word in cached data (${finalWord}) doesn't match search word (${normalizedWord})`
+            );
+          }
+        }
+
         setDefinition(cached);
         addToSearchHistory(word, cached); // Add to history with cached data
         toast.success("Retrieved from cache", { duration: 2000 });
@@ -1440,6 +1548,23 @@ function Deconstructor({ word }: { word?: string }) {
 
       // Validate the response data against the schema
       const validatedData = wordSchema.parse(responseData);
+
+      // Additional validation: Check if the final word in combinations matches the search word
+      const lastLayer =
+        validatedData.combinations[validatedData.combinations.length - 1];
+      if (lastLayer && lastLayer.length > 0) {
+        const finalWord = lastLayer[0].text.toLowerCase();
+        const searchWordLower = normalizedWord.toLowerCase();
+        // Check if the final word is related to the search word
+        if (
+          !finalWord.includes(searchWordLower) &&
+          !searchWordLower.includes(finalWord)
+        ) {
+          throw new Error(
+            `API returned data for a different word: ${finalWord} instead of ${word}`
+          );
+        }
+      }
 
       if (response.status === 203) {
         toast.info(
