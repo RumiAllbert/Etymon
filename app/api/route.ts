@@ -19,6 +19,18 @@ function validateWordParts(word: string, parts: WordOutput["parts"]): string[] {
   const combinedParts = parts.map((p) => p.text).join("");
   const commaSeparatedParts = parts.map((p) => p.text).join(", ");
 
+  // More flexible validation for words that might be returned in Greek
+  // We'll check if the combined parts contain non-Latin characters
+  const hasNonLatinChars = /[^\u0000-\u007F]/.test(combinedParts);
+  
+  if (hasNonLatinChars) {
+    // For words with non-Latin characters (like Greek), we'll skip the strict validation
+    // as the model might return the original Greek form of an English word
+    console.log("Word contains non-Latin characters, skipping strict validation");
+    return [];
+  }
+
+  // For regular Latin-character words, perform the original validation
   if (combinedParts.toLowerCase() !== word.toLowerCase().replaceAll(" ", "")) {
     errors.push(
       `The parts "${commaSeparatedParts}" do not combine to form the word "${word}"`
@@ -66,10 +78,20 @@ function validateCombinations(word: string, output: WordOutput): string[] {
     );
   }
 
-  // Check if last combination is the full word
+  // Check if last combination is the full word - with more flexibility for Greek words
   if (lastLayer?.length === 1) {
     const finalWord = lastLayer[0].text.toLowerCase();
-    if (finalWord !== word.toLowerCase()) {
+    const hasNonLatinChars = /[^\u0000-\u007F]/.test(finalWord);
+    
+    // For words with non-Latin characters, we'll use a more flexible validation
+    if (hasNonLatinChars) {
+      // For Greek words, we'll just check if the thought field mentions the search word
+      if (!output.thought.toLowerCase().includes(word.toLowerCase())) {
+        errors.push(
+          `The etymology explanation doesn't mention the search term "${word}". Please ensure the etymology is for the correct word.`
+        );
+      }
+    } else if (finalWord !== word.toLowerCase()) {
       errors.push(
         `The final combination "${finalWord}" does not match the input word "${word}"`
       );
@@ -192,7 +214,13 @@ Key Requirements:
 3. Provide 1-3 similar words sharing significant roots
 4. Keep all explanations brief and precise
 5. Never split or add dashes to the main word in the top level display
-6. For Greek words: Always include original Greek script in originalWord and thought fields
+6. For Greek words or words with Greek origins: Always include original Greek script in originalWord and thought fields
+
+IMPORTANT: When analyzing English words with Greek origins, you should:
+- Include the original Greek form in the thought field
+- Use Greek script in the originalWord field for Greek components
+- Ensure the final word in combinations matches the input word (in English)
+- For example, if analyzing "comedy", mention "κωμωδία" (kōmōdía) in the thought field, but keep "Comedy" as the final word
 
 Example 1 (Latin Word):
 {
@@ -280,6 +308,49 @@ Example 2 (Greek Word):
   ]
 }
 
+Example 3 (English word with Greek origin):
+{
+  "thought": "From Ancient Greek 'κωμῳδία' (kōmōidía) meaning 'comedy', derived from 'κῶμος' (kômos) 'revelry, merrymaking' and 'ᾠδή' (ōidḗ) 'song'. Entered English through Latin 'comoedia'.",
+  "parts": [
+    {
+      "id": "komos",
+      "text": "Com",
+      "originalWord": "κῶμος",
+      "origin": "Ancient Greek",
+      "meaning": "revelry, merrymaking"
+    },
+    {
+      "id": "oide",
+      "text": "edy",
+      "originalWord": "ᾠδή",
+      "origin": "Ancient Greek",
+      "meaning": "song, ode"
+    }
+  ],
+  "combinations": [
+    [
+      {
+        "id": "comedy",
+        "text": "Comedy",
+        "definition": "a dramatic work that is light and humorous in tone with a happy conclusion",
+        "sourceIds": ["komos", "oide"]
+      }
+    ]
+  ],
+  "similarWords": [
+    {
+      "word": "tragedy",
+      "explanation": "from Greek 'τραγῳδία' (tragōidía), using the same '-edy' ending",
+      "sharedOrigin": "Greek ᾠδή (ōidḗ) 'song'"
+    },
+    {
+      "word": "melodrama",
+      "explanation": "from Greek 'μέλος' (mélos) 'song' + 'δρᾶμα' (drâma) 'action'",
+      "sharedOrigin": "Greek theatrical tradition"
+    }
+  ]
+}
+
 Guidelines:
 1. Always show the complete word at the top level without dashes or splits
 2. Break down into meaningful components that show clear etymology
@@ -288,11 +359,12 @@ Guidelines:
 5. Keep definitions concise but informative
 6. Include only verifiable etymological relationships
 7. Use consistent language origin labeling
-8. For Greek words:
+8. For Greek words or words with Greek origins:
    - Always use original Greek script in originalWord field
    - Use Greek script in text field when appropriate
    - Include both Greek script and transliteration in thought field
    - Show Greek script in similarWords when they're Greek
+   - For English words derived from Greek, keep the final combination in English
 9. For Romance languages:
    - Trace both direct and Latin origins
    - Show connections to other Romance languages when relevant

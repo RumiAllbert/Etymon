@@ -1013,19 +1013,28 @@ function getCachedWord(word: string): Definition | null {
         validatedData.combinations[validatedData.combinations.length - 1];
       if (lastLayer && lastLayer.length > 0) {
         const finalWord = lastLayer[0].text.toLowerCase();
-        // Check if the final word is related to the search word
-        if (
+
+        // Check if the final word contains non-Latin characters (like Greek)
+        const hasNonLatinChars = /[^\u0000-\u007F]/.test(finalWord);
+
+        if (hasNonLatinChars) {
+          // For Greek words, check if the thought field mentions the search word
+          if (
+            !validatedData.thought.toLowerCase().includes(normalizedSearchWord)
+          ) {
+            throw new Error(
+              `Thought field doesn't mention search word (${normalizedSearchWord})`
+            );
+          }
+        }
+        // For Latin-character words, check if the final word is related to the search word
+        else if (
           !finalWord.includes(normalizedSearchWord) &&
           !normalizedSearchWord.includes(finalWord)
         ) {
-          console.error(
-            "Final word in combinations doesn't match search word:",
-            finalWord,
-            "vs",
-            normalizedSearchWord
+          throw new Error(
+            `Final word in cached data (${finalWord}) doesn't match search word (${normalizedSearchWord})`
           );
-          localStorage.removeItem(cacheKey);
-          return null;
         }
       }
 
@@ -1071,8 +1080,20 @@ function cacheWord(word: string, data: Definition) {
         validatedData.combinations[validatedData.combinations.length - 1];
       if (lastLayer && lastLayer.length > 0) {
         const finalWord = lastLayer[0].text.toLowerCase();
-        // Check if the final word is related to the search word
-        if (
+
+        // Check if the final word contains non-Latin characters (like Greek)
+        const hasNonLatinChars = /[^\u0000-\u007F]/.test(finalWord);
+
+        if (hasNonLatinChars) {
+          // For Greek words, check if the thought field mentions the search word
+          if (!validatedData.thought.toLowerCase().includes(normalizedWord)) {
+            throw new Error(
+              `Thought field doesn't mention search word (${normalizedWord})`
+            );
+          }
+        }
+        // For Latin-character words, check if the final word is related to the search word
+        else if (
           !finalWord.includes(normalizedWord) &&
           !normalizedWord.includes(finalWord)
         ) {
@@ -1491,8 +1512,20 @@ function Deconstructor({ word }: { word?: string }) {
         const lastLayer = cached.combinations[cached.combinations.length - 1];
         if (lastLayer && lastLayer.length > 0) {
           const finalWord = lastLayer[0].text.toLowerCase();
-          // Check if the final word is related to the search word
-          if (
+
+          // Check if the final word contains non-Latin characters (like Greek)
+          const hasNonLatinChars = /[^\u0000-\u007F]/.test(finalWord);
+
+          if (hasNonLatinChars) {
+            // For Greek words, check if the thought field mentions the search word
+            if (!cached.thought.toLowerCase().includes(normalizedWord)) {
+              throw new Error(
+                `Thought field doesn't mention search word (${normalizedWord})`
+              );
+            }
+          }
+          // For Latin-character words, check if the final word is related to the search word
+          else if (
             !finalWord.includes(normalizedWord) &&
             !normalizedWord.includes(finalWord)
           ) {
@@ -1559,8 +1592,20 @@ function Deconstructor({ word }: { word?: string }) {
       if (lastLayer && lastLayer.length > 0) {
         const finalWord = lastLayer[0].text.toLowerCase();
         const searchWordLower = normalizedWord.toLowerCase();
-        // Check if the final word is related to the search word
-        if (
+
+        // Check if the final word contains non-Latin characters (like Greek)
+        const hasNonLatinChars = /[^\u0000-\u007F]/.test(finalWord);
+
+        if (hasNonLatinChars) {
+          // For Greek words, check if the thought field mentions the search word
+          if (!validatedData.thought.toLowerCase().includes(searchWordLower)) {
+            throw new Error(
+              `API returned data for a word not related to "${word}"`
+            );
+          }
+        }
+        // For Latin-character words, check if the final word is related to the search word
+        else if (
           !finalWord.includes(searchWordLower) &&
           !searchWordLower.includes(finalWord)
         ) {
