@@ -51,6 +51,7 @@ export default function Spinner({
     return (
       <div className="flex items-center justify-center h-5 overflow-hidden">
         <div className="flex flex-col animate-bounce-slow">
+          {/* Complete Greek alphabet with some special characters interspersed */}
           <span className="text-lg font-serif h-5 flex items-center justify-center">
             α
           </span>
@@ -65,9 +66,6 @@ export default function Spinner({
           </span>
           <span className="text-lg font-serif h-5 flex items-center justify-center">
             ε
-          </span>
-          <span className="text-lg font-serif h-5 flex items-center justify-center">
-            文
           </span>
           <span className="text-lg font-serif h-5 flex items-center justify-center">
             ζ
@@ -88,9 +86,6 @@ export default function Spinner({
             λ
           </span>
           <span className="text-lg font-serif h-5 flex items-center justify-center">
-            字
-          </span>
-          <span className="text-lg font-serif h-5 flex items-center justify-center">
             μ
           </span>
           <span className="text-lg font-serif h-5 flex items-center justify-center">
@@ -109,9 +104,6 @@ export default function Spinner({
             ρ
           </span>
           <span className="text-lg font-serif h-5 flex items-center justify-center">
-            ℵ
-          </span>
-          <span className="text-lg font-serif h-5 flex items-center justify-center">
             σ
           </span>
           <span className="text-lg font-serif h-5 flex items-center justify-center">
@@ -124,22 +116,121 @@ export default function Spinner({
             φ
           </span>
           <span className="text-lg font-serif h-5 flex items-center justify-center">
-            א
-          </span>
-          <span className="text-lg font-serif h-5 flex items-center justify-center">
             χ
           </span>
           <span className="text-lg font-serif h-5 flex items-center justify-center">
             ψ
           </span>
           <span className="text-lg font-serif h-5 flex items-center justify-center">
-            Ω
+            ω
+          </span>
+          {/* Other alphabets and special characters */}
+          <span className="text-lg font-serif h-5 flex items-center justify-center">
+            文
+          </span>
+          <span className="text-lg font-serif h-5 flex items-center justify-center">
+            字
+          </span>
+          <span className="text-lg font-serif h-5 flex items-center justify-center">
+            ℵ
+          </span>
+          <span className="text-lg font-serif h-5 flex items-center justify-center">
+            א
           </span>
           <span className="text-lg font-serif h-5 flex items-center justify-center">
             ᚠ
           </span>
           <span className="text-lg font-serif h-5 flex items-center justify-center">
             ह
+          </span>
+          {/* Uppercase Greek letters */}
+          <span className="text-lg font-serif h-5 flex items-center justify-center">
+            Α
+          </span>
+          <span className="text-lg font-serif h-5 flex items-center justify-center">
+            Β
+          </span>
+          <span className="text-lg font-serif h-5 flex items-center justify-center">
+            Γ
+          </span>
+          <span className="text-lg font-serif h-5 flex items-center justify-center">
+            Δ
+          </span>
+          <span className="text-lg font-serif h-5 flex items-center justify-center">
+            Ε
+          </span>
+          <span className="text-lg font-serif h-5 flex items-center justify-center">
+            Ζ
+          </span>
+          <span className="text-lg font-serif h-5 flex items-center justify-center">
+            Η
+          </span>
+          <span className="text-lg font-serif h-5 flex items-center justify-center">
+            Θ
+          </span>
+          <span className="text-lg font-serif h-5 flex items-center justify-center">
+            Ι
+          </span>
+          <span className="text-lg font-serif h-5 flex items-center justify-center">
+            Κ
+          </span>
+          <span className="text-lg font-serif h-5 flex items-center justify-center">
+            Λ
+          </span>
+          <span className="text-lg font-serif h-5 flex items-center justify-center">
+            Μ
+          </span>
+          <span className="text-lg font-serif h-5 flex items-center justify-center">
+            Ν
+          </span>
+          <span className="text-lg font-serif h-5 flex items-center justify-center">
+            Ξ
+          </span>
+          <span className="text-lg font-serif h-5 flex items-center justify-center">
+            Ο
+          </span>
+          <span className="text-lg font-serif h-5 flex items-center justify-center">
+            Π
+          </span>
+          <span className="text-lg font-serif h-5 flex items-center justify-center">
+            Ρ
+          </span>
+          <span className="text-lg font-serif h-5 flex items-center justify-center">
+            Σ
+          </span>
+          <span className="text-lg font-serif h-5 flex items-center justify-center">
+            Τ
+          </span>
+          <span className="text-lg font-serif h-5 flex items-center justify-center">
+            Υ
+          </span>
+          <span className="text-lg font-serif h-5 flex items-center justify-center">
+            Φ
+          </span>
+          <span className="text-lg font-serif h-5 flex items-center justify-center">
+            Χ
+          </span>
+          <span className="text-lg font-serif h-5 flex items-center justify-center">
+            Ψ
+          </span>
+          <span className="text-lg font-serif h-5 flex items-center justify-center">
+            Ω
+          </span>
+          {/* Duplicate first few characters to create a seamless loop */}
+          <span className="text-lg font-serif h-5 flex items-center justify-center">
+            α
+          </span>
+          <span className="text-lg font-serif h-5 flex items-center justify-center">
+            β
+          </span>
+          <span className="text-lg font-serif h-5 flex items-center justify-center">
+            γ
+          </span>
+          <span className="text-lg font-serif h-5 flex items-center justify-center">
+            δ
+          </span>
+          <span className="text-lg font-serif h-5 flex items-center justify-center">
+            ε
           </span>
         </div>
       </div>
@@ -249,23 +340,44 @@ export default function Spinner({
 
         {/* Root nodes */}
         <circle
-          cx="12"
-          cy="8"
+          cx="5"
+          cy="21"
           r="1"
           fill="currentColor"
           className="animate-pulse"
         />
         <circle
-          cx="12"
-          cy="14"
-          r="0.7"
+          cx="9"
+          cy="21"
+          r="1"
           fill="currentColor"
           className="animate-pulse-delay-1"
         />
         <circle
-          cx="12"
-          cy="10"
-          r="0.7"
+          cx="15"
+          cy="21"
+          r="1"
+          fill="currentColor"
+          className="animate-pulse-delay-2"
+        />
+        <circle
+          cx="19"
+          cy="21"
+          r="1"
+          fill="currentColor"
+          className="animate-pulse"
+        />
+        <circle
+          cx="3"
+          cy="19"
+          r="1"
+          fill="currentColor"
+          className="animate-pulse-delay-1"
+        />
+        <circle
+          cx="21"
+          cy="19"
+          r="1"
           fill="currentColor"
           className="animate-pulse-delay-2"
         />
@@ -273,7 +385,7 @@ export default function Spinner({
     );
   }
 
-  // Enhanced Word Tree animation - a more complex tree visualization with more connections
+  // Enhanced Word Tree animation - more connections
   if (selectedVariant === "wordTree") {
     return (
       <svg
@@ -282,7 +394,7 @@ export default function Spinner({
         fill="none"
         xmlns="http://www.w3.org/2000/svg"
       >
-        {/* Main stem */}
+        {/* Main trunk */}
         <path
           d="M12 2V6"
           stroke="currentColor"
@@ -451,7 +563,7 @@ export default function Spinner({
     );
   }
 
-  // Default to classic if variant is not recognized
+  // Default to classic spinner if no variant matches
   return (
     <svg
       className="animate-spin h-5 w-5"
