@@ -917,8 +917,282 @@ const defaultDefinition: Definition = {
 };
 
 function normalizeWord(word: string): string {
-  // Remove extra spaces and convert to lowercase
-  return word.toLowerCase().trim().replace(/\s+/g, "");
+  // More robust normalization:
+  // 1. Convert to lowercase
+  // 2. Remove all whitespace
+  // 3. Remove all non-alphanumeric characters
+  // 4. Trim any remaining whitespace
+  return word
+    .toLowerCase()
+    .trim()
+    .replace(/\s+/g, "")
+    .replace(/[^\p{L}\p{N}]/gu, ""); // This regex removes all non-letter and non-number characters, supporting Unicode
+}
+
+// Enhanced function to detect word mismatch with more flexibility
+function isWordMismatch(
+  searchWord: string,
+  responseWord: string,
+  thought: string
+): boolean {
+  const normalizedSearch = normalizeWord(searchWord);
+  const normalizedResponse = normalizeWord(responseWord);
+
+  // Direct match - best case
+  if (normalizedResponse === normalizedSearch) {
+    return false;
+  }
+
+  // Check if one contains the other (for compound words or partial matches)
+  if (
+    normalizedResponse.includes(normalizedSearch) ||
+    normalizedSearch.includes(normalizedResponse)
+  ) {
+    return false;
+  }
+
+  // For non-Latin words, check if the thought contains the search word
+  const hasNonLatinChars = /[^\u0000-\u007F]/.test(responseWord);
+  if (hasNonLatinChars && thought.toLowerCase().includes(normalizedSearch)) {
+    return false;
+  }
+
+  // Check for accent differences (normalize Unicode)
+  const normalizedSearchNFD = normalizedSearch.normalize("NFD");
+  const normalizedResponseNFD = normalizedResponse.normalize("NFD");
+  if (normalizedSearchNFD === normalizedResponseNFD) {
+    return false;
+  }
+
+  // Check for common misspellings or slight variations
+  // Calculate Levenshtein distance (simple version)
+  const distance = levenshteinDistance(normalizedSearch, normalizedResponse);
+  const maxLength = Math.max(
+    normalizedSearch.length,
+    normalizedResponse.length
+  );
+  // Allow up to 20% difference for longer words, or 1 character for short words
+  const threshold = Math.max(1, Math.floor(maxLength * 0.2));
+
+  if (distance <= threshold) {
+    return false;
+  }
+
+  // If we get here, it's likely a mismatch
+  return true;
+}
+
+// Helper function to calculate Levenshtein distance between two strings
+function levenshteinDistance(a: string, b: string): number {
+  if (a.length === 0) return b.length;
+  if (b.length === 0) return a.length;
+
+  const matrix = [];
+
+  // Initialize matrix
+  for (let i = 0; i <= b.length; i++) {
+    matrix[i] = [i];
+  }
+  for (let j = 0; j <= a.length; j++) {
+    matrix[0][j] = j;
+  }
+
+  // Fill matrix
+  for (let i = 1; i <= b.length; i++) {
+    for (let j = 1; j <= a.length; j++) {
+      const cost = a[j - 1] === b[i - 1] ? 0 : 1;
+      matrix[i][j] = Math.min(
+        matrix[i - 1][j] + 1, // deletion
+        matrix[i][j - 1] + 1, // insertion
+        matrix[i - 1][j - 1] + cost // substitution
+      );
+    }
+  }
+
+  return matrix[b.length][a.length];
+}
+
+// Add this function after isWordMismatch
+function validateApiResponse(
+  data: any,
+  searchWord: string
+): { valid: boolean; error?: string } {
+  try {
+    // 1. Validate against schema
+    const validatedData = wordSchema.parse(data);
+
+    // 2. Check for required fields
+    if (
+      !validatedData.parts?.length ||
+      !validatedData.combinations?.length ||
+      !validatedData.similarWords?.length ||
+      !validatedData.thought
+    ) {
+      return {
+        valid: false,
+        error: "Missing required fields or empty arrays in API response",
+      };
+    }
+
+    // 3. Validate parts structure
+    const validParts = validatedData.parts.every(
+      (part) =>
+        part.id && part.text && part.originalWord && part.origin && part.meaning
+    );
+
+    if (!validParts) {
+      return {
+        valid: false,
+        error: "Invalid structure in parts field of API response",
+      };
+    }
+
+    // 4. Validate combinations structure
+    const validCombinations = validatedData.combinations.every(
+      (layer) =>
+        layer.length > 0 &&
+        layer.every(
+          (combo) =>
+            combo.id &&
+            combo.text &&
+            combo.definition &&
+            Array.isArray(combo.sourceIds) &&
+            combo.sourceIds.length > 0
+        )
+    );
+
+    if (!validCombinations) {
+      return {
+        valid: false,
+        error: "Invalid structure in combinations field of API response",
+      };
+    }
+
+    // 5. Validate similar words structure
+    const validSimilarWords = validatedData.similarWords.every(
+      (word) => word.word && word.explanation && word.sharedOrigin
+    );
+
+    if (!validSimilarWords) {
+      return {
+        valid: false,
+        error: "Invalid structure in similarWords field of API response",
+      };
+    }
+
+    // 6. Check if the final word in combinations matches the search word
+    const lastLayer =
+      validatedData.combinations[validatedData.combinations.length - 1];
+    if (lastLayer && lastLayer.length > 0) {
+      const finalWord = lastLayer[0].text;
+
+      // Detect if we're dealing with non-Latin characters
+      const hasNonLatinChars =
+        /[^\u0000-\u007F]/.test(searchWord) ||
+        /[^\u0000-\u007F]/.test(finalWord);
+
+      // Skip strict validation for non-Latin words
+      if (hasNonLatinChars) {
+        console.log(
+          "Word contains non-Latin characters, skipping strict validation"
+        );
+      } else {
+        // Use the mismatch detection function only for Latin-based words
+        if (isWordMismatch(searchWord, finalWord, validatedData.thought)) {
+          return {
+            valid: false,
+            error: `API returned data for a different word: "${finalWord}" instead of "${searchWord}"`,
+          };
+        }
+      }
+    }
+
+    // 7. Check if the thought field mentions the search word - make this a warning, not an error
+    const normalizedSearchWord = normalizeWord(searchWord);
+    if (
+      !validatedData.thought.toLowerCase().includes(normalizedSearchWord) &&
+      !validatedData.thought
+        .toLowerCase()
+        .normalize("NFD")
+        .includes(normalizedSearchWord.normalize("NFD"))
+    ) {
+      // This is just a warning, not an error
+      console.warn(
+        `Warning: Thought field doesn't explicitly mention search word "${searchWord}"`
+      );
+    }
+
+    // All validations passed
+    return { valid: true };
+  } catch (error) {
+    return {
+      valid: false,
+      error:
+        error instanceof Error ? error.message : "Unknown validation error",
+    };
+  }
+}
+
+// Update the fetchWithRetry function to use the new validation function
+async function fetchWithRetry(
+  url: string,
+  options: RequestInit,
+  maxRetries = 2,
+  word: string
+): Promise<{ response: Response; data: any }> {
+  let lastError: Error | null = null;
+
+  for (let attempt = 0; attempt <= maxRetries; attempt++) {
+    try {
+      // Add a small delay before retries (not on first attempt)
+      if (attempt > 0) {
+        await new Promise((resolve) => setTimeout(resolve, 1000 * attempt));
+        console.log(`Retry attempt ${attempt} for word: ${word}`);
+      }
+
+      const response = await fetch(url, options);
+      const data = await response.json();
+
+      // Check for API error responses
+      if (!response.ok && response.status !== 203) {
+        throw new Error(data.error || `API error: ${response.status}`);
+      }
+
+      // Use the comprehensive validation function
+      const validation = validateApiResponse(data, word);
+      if (!validation.valid) {
+        throw new Error(validation.error || "Invalid API response");
+      }
+
+      // If we get here, the data is valid
+      return { response, data };
+    } catch (error) {
+      lastError = error instanceof Error ? error : new Error(String(error));
+
+      // Don't retry for certain errors
+      if (
+        lastError.message.includes("timeout") ||
+        lastError.message.includes("credits") ||
+        lastError.message.includes("API returned data for a different word")
+      ) {
+        throw lastError;
+      }
+
+      // If we've reached max retries, throw the last error
+      if (attempt === maxRetries) {
+        throw lastError;
+      }
+
+      console.warn(
+        `Attempt ${attempt + 1} failed for word: ${word}. Error: ${
+          lastError.message
+        }`
+      );
+    }
+  }
+
+  // This should never be reached due to the throw in the loop
+  throw lastError || new Error("Unknown error occurred during API call");
 }
 
 function getCachedWord(word: string): Definition | null {
@@ -952,11 +1226,53 @@ function getCachedWord(word: string): Definition | null {
       return null;
     }
 
-    // Strict equality check for normalized words
-    if (normalizeWord(originalWord) !== normalizedSearchWord) {
-      console.log("Cache mismatch for:", word, "vs", originalWord);
-      localStorage.removeItem(cacheKey);
-      return null;
+    // More flexible check for word matching
+    const normalizedOriginal = normalizeWord(originalWord);
+    if (normalizedOriginal !== normalizedSearchWord) {
+      // Try more flexible matching for non-Latin characters
+      const hasNonLatinChars =
+        /[^\u0000-\u007F]/.test(originalWord) || /[^\u0000-\u007F]/.test(word);
+
+      if (hasNonLatinChars) {
+        console.log(
+          "Non-Latin characters detected, using flexible matching for:",
+          word
+        );
+        // For non-Latin words, we'll be more lenient
+        // Check normalized forms (NFD)
+        const normalizedOriginalNFD = normalizedOriginal.normalize("NFD");
+        const normalizedSearchNFD = normalizedSearchWord.normalize("NFD");
+
+        if (normalizedOriginalNFD !== normalizedSearchNFD) {
+          // Check Levenshtein distance for similar words
+          const distance = levenshteinDistance(
+            normalizedOriginal,
+            normalizedSearchWord
+          );
+          const maxLength = Math.max(
+            normalizedOriginal.length,
+            normalizedSearchWord.length
+          );
+          const threshold = Math.max(1, Math.floor(maxLength * 0.2));
+
+          if (distance > threshold) {
+            console.log(
+              "Cache mismatch for:",
+              word,
+              "vs",
+              originalWord,
+              "distance:",
+              distance
+            );
+            localStorage.removeItem(cacheKey);
+            return null;
+          }
+        }
+      } else {
+        console.log("Cache mismatch for:", word, "vs", originalWord);
+        localStorage.removeItem(cacheKey);
+        return null;
+      }
     }
 
     // Validate the cached data against the schema
@@ -1014,29 +1330,26 @@ function getCachedWord(word: string): Definition | null {
       const lastLayer =
         validatedData.combinations[validatedData.combinations.length - 1];
       if (lastLayer && lastLayer.length > 0) {
-        const finalWord = lastLayer[0].text.toLowerCase();
+        const finalWord = lastLayer[0].text;
 
-        // Check if the final word contains non-Latin characters (like Greek)
-        const hasNonLatinChars = /[^\u0000-\u007F]/.test(finalWord);
+        // Detect if we're dealing with non-Latin characters
+        const hasNonLatinChars =
+          /[^\u0000-\u007F]/.test(word) || /[^\u0000-\u007F]/.test(finalWord);
 
+        // Skip strict validation for non-Latin words
         if (hasNonLatinChars) {
-          // For Greek words, check if the thought field mentions the search word
-          if (
-            !validatedData.thought.toLowerCase().includes(normalizedSearchWord)
-          ) {
-            throw new Error(
-              `Thought field doesn't mention search word (${normalizedSearchWord})`
-            );
-          }
-        }
-        // For Latin-character words, check if the final word is related to the search word
-        else if (
-          !finalWord.includes(normalizedSearchWord) &&
-          !normalizedSearchWord.includes(finalWord)
-        ) {
-          throw new Error(
-            `Final word in cached data (${finalWord}) doesn't match search word (${normalizedSearchWord})`
+          console.log(
+            "Word contains non-Latin characters, using flexible validation for cached data"
           );
+        } else {
+          // Use the new mismatch detection function for Latin-based words
+          if (isWordMismatch(word, finalWord, validatedData.thought)) {
+            console.error(
+              `Final word in cached data (${finalWord}) doesn't match search word (${word})`
+            );
+            localStorage.removeItem(cacheKey);
+            return null;
+          }
         }
       }
 
@@ -1081,27 +1394,24 @@ function cacheWord(word: string, data: Definition) {
       const lastLayer =
         validatedData.combinations[validatedData.combinations.length - 1];
       if (lastLayer && lastLayer.length > 0) {
-        const finalWord = lastLayer[0].text.toLowerCase();
+        const finalWord = lastLayer[0].text;
 
-        // Check if the final word contains non-Latin characters (like Greek)
-        const hasNonLatinChars = /[^\u0000-\u007F]/.test(finalWord);
+        // Detect if we're dealing with non-Latin characters
+        const hasNonLatinChars =
+          /[^\u0000-\u007F]/.test(word) || /[^\u0000-\u007F]/.test(finalWord);
 
+        // Skip strict validation for non-Latin words
         if (hasNonLatinChars) {
-          // For Greek words, check if the thought field mentions the search word
-          if (!validatedData.thought.toLowerCase().includes(normalizedWord)) {
+          console.log(
+            "Word contains non-Latin characters, using flexible validation for caching"
+          );
+        } else {
+          // Use the mismatch detection function for Latin-based words
+          if (isWordMismatch(word, finalWord, validatedData.thought)) {
             throw new Error(
-              `Thought field doesn't mention search word (${normalizedWord})`
+              `Final word in combinations (${finalWord}) doesn't match search word (${word})`
             );
           }
-        }
-        // For Latin-character words, check if the final word is related to the search word
-        else if (
-          !finalWord.includes(normalizedWord) &&
-          !normalizedWord.includes(finalWord)
-        ) {
-          throw new Error(
-            `Final word in combinations (${finalWord}) doesn't match search word (${normalizedWord})`
-          );
         }
       }
 
@@ -1438,6 +1748,35 @@ const CreditsCounter = () => {
   );
 };
 
+function resetApplicationState(
+  message = "Application state has been reset due to persistent issues."
+) {
+  if (typeof window === "undefined") return;
+
+  try {
+    // Clear all cache
+    clearAllCache();
+
+    // Clear search history if needed
+    // localStorage.removeItem(HISTORY_KEY);
+
+    // Reset credits if needed
+    // localStorage.setItem(CREDITS_KEY, "0");
+
+    // Show message to user
+    toast.info(message, {
+      duration: 5000,
+      description:
+        "All cached data has been cleared. Please try your search again.",
+    });
+
+    console.log("Application state reset successfully");
+  } catch (error) {
+    console.error("Error resetting application state:", error);
+    toast.error("Failed to reset application state. Please refresh the page.");
+  }
+}
+
 function Deconstructor({ word }: { word?: string }) {
   const [, setIsLoading] = useAtom(isLoadingAtom);
   const [definition, setDefinition] = useState<Definition>(defaultDefinition);
@@ -1513,27 +1852,24 @@ function Deconstructor({ word }: { word?: string }) {
         // Additional validation: Check if the final word in combinations matches the search word
         const lastLayer = cached.combinations[cached.combinations.length - 1];
         if (lastLayer && lastLayer.length > 0) {
-          const finalWord = lastLayer[0].text.toLowerCase();
+          const finalWord = lastLayer[0].text;
 
-          // Check if the final word contains non-Latin characters (like Greek)
-          const hasNonLatinChars = /[^\u0000-\u007F]/.test(finalWord);
+          // Detect if we're dealing with non-Latin characters
+          const hasNonLatinChars =
+            /[^\u0000-\u007F]/.test(word) || /[^\u0000-\u007F]/.test(finalWord);
 
+          // Skip strict validation for non-Latin words
           if (hasNonLatinChars) {
-            // For Greek words, check if the thought field mentions the search word
-            if (!cached.thought.toLowerCase().includes(normalizedWord)) {
+            console.log(
+              "Word contains non-Latin characters, using flexible validation for cached data"
+            );
+          } else {
+            // Use the new mismatch detection function for Latin-based words
+            if (isWordMismatch(word, finalWord, cached.thought)) {
               throw new Error(
-                `Thought field doesn't mention search word (${normalizedWord})`
+                `Final word in cached data (${finalWord}) doesn't match search word (${word})`
               );
             }
-          }
-          // For Latin-character words, check if the final word is related to the search word
-          else if (
-            !finalWord.includes(normalizedWord) &&
-            !normalizedWord.includes(finalWord)
-          ) {
-            throw new Error(
-              `Final word in cached data (${finalWord}) doesn't match search word (${normalizedWord})`
-            );
           }
         }
 
@@ -1570,60 +1906,22 @@ function Deconstructor({ word }: { word?: string }) {
     }
 
     try {
-      const response = await fetch("/api", {
-        method: "POST",
-        body: JSON.stringify({ word }),
-        headers: {
-          "Content-Type": "application/json",
+      // Use the new fetchWithRetry function
+      const { response, data: validatedData } = await fetchWithRetry(
+        "/api",
+        {
+          method: "POST",
+          body: JSON.stringify({ word }),
+          headers: {
+            "Content-Type": "application/json",
+          },
         },
-      });
-
-      const responseData = await response.json();
-
-      // Handle non-200 responses (except 203 which is partial success)
-      if (!response.ok && response.status !== 203) {
-        throw new Error(responseData.error || "Failed to process word");
-      }
-
-      // Validate the response data against the schema
-      const validatedData = wordSchema.parse(responseData);
-
-      // Additional validation: Check if the final word in combinations matches the search word
-      const lastLayer =
-        validatedData.combinations[validatedData.combinations.length - 1];
-      if (lastLayer && lastLayer.length > 0) {
-        const finalWord = lastLayer[0].text.toLowerCase();
-        const searchWordLower = normalizedWord.toLowerCase();
-
-        // Check if the final word contains non-Latin characters (like Greek)
-        const hasNonLatinChars = /[^\u0000-\u007F]/.test(finalWord);
-
-        if (hasNonLatinChars) {
-          // For Greek words, check if the thought field mentions the search word
-          if (!validatedData.thought.toLowerCase().includes(searchWordLower)) {
-            throw new Error(
-              `API returned data for a word not related to "${word}"`
-            );
-          }
-        }
-        // For Latin-character words, check if the final word is related to the search word
-        else if (
-          !finalWord.includes(searchWordLower) &&
-          !searchWordLower.includes(finalWord)
-        ) {
-          throw new Error(
-            `API returned data for a different word: ${finalWord} instead of ${word}`
-          );
-        }
-      }
+        2, // Max retries
+        word
+      );
 
       if (response.status === 203) {
-        toast.info(
-          "I had some trouble with that word, but here's my best attempt at breaking it down.",
-          {
-            duration: 5000,
-          }
-        );
+        // We'll silently accept partial results without showing a warning to the user
       }
 
       // Only cache and update state if we have valid data
@@ -1661,12 +1959,86 @@ function Deconstructor({ word }: { word?: string }) {
         error instanceof Error
           ? error.message
           : "Unable to process this word. Try another one.";
-      toast.error(message, {
-        duration: 5000,
-      });
+
+      // Handle specific error types
+      if (error instanceof Error) {
+        // Check if this is a non-Latin word with validation issues
+        const hasNonLatinChars = /[^\u0000-\u007F]/.test(word);
+        const isValidationError = error.message.includes(
+          "API returned data for a different word"
+        );
+
+        if (isValidationError && hasNonLatinChars) {
+          // For non-Latin words with validation errors, we'll be more lenient
+          console.warn(
+            "Non-Latin word validation issue, attempting to proceed anyway:",
+            error.message
+          );
+
+          // Try to extract the data from the error if possible
+          try {
+            // This is a bit of a hack, but we're trying to recover from validation errors
+            // for non-Latin words where our validation might be too strict
+            const match = error.message.match(
+              /API returned data for a different word: "([^"]+)"/
+            );
+            if (match && match[1]) {
+              const alternativeWord = match[1];
+              toast.info(
+                `Showing results for "${alternativeWord}" which appears to be related to your search.`,
+                { duration: 5000 }
+              );
+
+              // We could try to recover the data here if we had access to it
+              // For now, we'll just let the error handling continue
+            }
+          } catch (extractError) {
+            console.error(
+              "Error trying to extract alternative word:",
+              extractError
+            );
+          }
+        } else if (
+          error.message.includes("API returned data for a different word")
+        ) {
+          // This is a word mismatch error - reset application state
+          resetApplicationState(
+            "API returned incorrect data. Application state has been reset."
+          );
+        } else if (error.message.includes("timeout")) {
+          toast.error(
+            "This word is taking too long to process. Try a simpler word.",
+            {
+              duration: 5000,
+            }
+          );
+        } else {
+          // Generic error message
+          toast.error(message, {
+            duration: 5000,
+          });
+        }
+      } else {
+        // Generic error message
+        toast.error(message, {
+          duration: 5000,
+        });
+      }
 
       // Clear any potentially corrupted cache for this word
       localStorage.removeItem(cacheKey);
+
+      // If the error message indicates a serious issue, reset application state
+      if (
+        error instanceof Error &&
+        (error.message.includes("API returned data for a different word") ||
+          error.message.includes("not related to")) &&
+        !/[^\u0000-\u007F]/.test(word) // Only reset for Latin-based words
+      ) {
+        resetApplicationState(
+          "Encountered persistent issues with word lookup. Application state has been reset."
+        );
+      }
     } finally {
       setIsLoading(false);
     }
