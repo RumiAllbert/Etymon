@@ -721,7 +721,7 @@ const InputNode = ({
             disabled={isLoading}
             className="w-[120px] px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-medium disabled:opacity-50 transition-colors flex items-center justify-center"
           >
-            {isLoading ? <Spinner /> : "Etymologize"}
+            {isLoading ? <Spinner variant="random" /> : "Etymologize"}
           </button>
         </div>
       </form>

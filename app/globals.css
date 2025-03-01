@@ -12,6 +12,104 @@ body {
   filter: blur(calc(var(--loading-state) * 20px));
 }
 
+/* Custom animations for spinners */
+.animate-bounce-slow {
+  animation: bounce-slow 8s infinite ease-in-out;
+}
+.animate-grow-path {
+  animation: grow-path 2.5s infinite alternate ease-in-out;
+}
+.animate-grow-path-delay-1 {
+  animation: grow-path 2.5s infinite alternate ease-in-out 0.15s;
+}
+.animate-grow-branch-1 {
+  animation: grow-branch 2.5s infinite alternate ease-in-out 0.2s;
+}
+.animate-grow-branch-2 {
+  animation: grow-branch 2.5s infinite alternate ease-in-out 0.4s;
+}
+.animate-grow-branch-3 {
+  animation: grow-branch 2.5s infinite alternate ease-in-out 0.6s;
+}
+.animate-grow-branch-4 {
+  animation: grow-branch 2.5s infinite alternate ease-in-out 0.8s;
+}
+.animate-grow-branch-5 {
+  animation: grow-branch 2.5s infinite alternate ease-in-out 1.0s;
+}
+.animate-grow-branch-6 {
+  animation: grow-branch 2.5s infinite alternate ease-in-out 1.2s;
+}
+.animate-grow-branch-7 {
+  animation: grow-branch 2.5s infinite alternate ease-in-out 1.4s;
+}
+.animate-write {
+  animation: write 3s infinite ease-in-out;
+}
+.animate-pulse {
+  animation: pulse 2s infinite ease-in-out;
+}
+.animate-pulse-delay-1 {
+  animation: pulse 2s infinite ease-in-out 0.5s;
+}
+.animate-pulse-delay-2 {
+  animation: pulse 2s infinite ease-in-out 1s;
+}
+
+@keyframes bounce-slow {
+  0%, 100% { transform: translateY(0); }
+  3.3% { transform: translateY(-20px); }
+  6.7% { transform: translateY(-40px); }
+  10% { transform: translateY(-60px); }
+  13.3% { transform: translateY(-80px); }
+  16.7% { transform: translateY(-100px); }
+  20% { transform: translateY(-120px); }
+  23.3% { transform: translateY(-140px); }
+  26.7% { transform: translateY(-160px); }
+  30% { transform: translateY(-180px); }
+  33.3% { transform: translateY(-200px); }
+  36.7% { transform: translateY(-220px); }
+  40% { transform: translateY(-240px); }
+  43.3% { transform: translateY(-260px); }
+  46.7% { transform: translateY(-280px); }
+  50% { transform: translateY(-300px); }
+  53.3% { transform: translateY(-320px); }
+  56.7% { transform: translateY(-340px); }
+  60% { transform: translateY(-360px); }
+  63.3% { transform: translateY(-380px); }
+  66.7% { transform: translateY(-400px); }
+  70% { transform: translateY(-420px); }
+  73.3% { transform: translateY(-440px); }
+  76.7% { transform: translateY(-460px); }
+  80% { transform: translateY(-480px); }
+  83.3% { transform: translateY(-500px); }
+  86.7% { transform: translateY(-520px); }
+  90% { transform: translateY(-540px); }
+  93.3% { transform: translateY(-560px); }
+  96.7% { transform: translateY(-580px); }
+}
+
+@keyframes grow-path {
+  0% { stroke-dasharray: 0, 200; stroke-dashoffset: 0; opacity: 0.3; }
+  100% { stroke-dasharray: 200, 200; stroke-dashoffset: 0; opacity: 1; }
+}
+
+@keyframes grow-branch {
+  0% { opacity: 0; stroke-dasharray: 0, 100; stroke-dashoffset: 0; }
+  100% { opacity: 1; stroke-dasharray: 100, 100; stroke-dashoffset: 0; }
+}
+
+@keyframes write {
+  0% { stroke-dasharray: 1, 100; stroke-dashoffset: 0; }
+  50% { stroke-dasharray: 50, 100; stroke-dashoffset: -25; }
+  100% { stroke-dasharray: 100, 100; stroke-dashoffset: -100; }
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.6; transform: scale(0.8); }
+}
+
 @layer base {
   :root {
     --background: 0 0% 100%;
