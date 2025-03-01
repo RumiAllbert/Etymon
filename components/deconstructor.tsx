@@ -668,9 +668,13 @@ const InputNode = ({
   return (
     <div className="flex flex-col items-center gap-4">
       <div className="flex items-center gap-2">
-        <h1 className="text-4xl font-serif dark:text-gray-100 text-gray-900">
+        <a
+          href="/"
+          className="text-4xl font-serif dark:text-gray-100 text-gray-900 hover:opacity-80 transition-opacity"
+          title="Go to home page"
+        >
           Etymon.ai
-        </h1>
+        </a>
         <span className="px-2 py-0.5 text-xs font-medium dark:bg-blue-500/20 bg-blue-500/10 dark:text-blue-300 text-blue-600 rounded-full">
           beta
         </span>
