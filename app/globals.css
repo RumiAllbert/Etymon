@@ -12,6 +12,75 @@ body {
   filter: blur(calc(var(--loading-state) * 20px));
 }
 
+/* Loading border animation */
+.loading-border {
+  position: relative;
+  overflow: visible;
+}
+
+.loading-border::before,
+.loading-border::after {
+  content: '';
+  position: absolute;
+  inset: -3px;
+  border-radius: 1rem;
+  z-index: -1;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.8s ease-out;
+}
+
+.loading-border.active::before,
+.loading-border.active::after {
+  opacity: 1;
+  transition: opacity 0.3s ease-in;
+}
+
+.loading-border::before {
+  background: linear-gradient(90deg, 
+    transparent, 
+    rgba(59, 130, 246, 0.3), 
+    rgba(124, 58, 237, 0.3), 
+    rgba(219, 39, 119, 0.3), 
+    rgba(124, 58, 237, 0.3), 
+    rgba(59, 130, 246, 0.3), 
+    transparent
+  );
+  background-size: 400% 100%;
+  animation: neon-flow 3s linear infinite;
+  filter: blur(12px);
+}
+
+.loading-border::after {
+  border: 2px solid transparent;
+  background: linear-gradient(90deg, 
+    transparent, 
+    #3b82f6, 
+    #7c3aed, 
+    #db2777, 
+    #7c3aed, 
+    #3b82f6, 
+    transparent
+  ) border-box;
+  -webkit-mask: 
+    linear-gradient(#fff 0 0) content-box,
+    linear-gradient(#fff 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  background-size: 400% 100%;
+  animation: neon-flow 3s linear infinite;
+  box-shadow: 0 0 10px 1px rgba(124, 58, 237, 0.5);
+}
+
+@keyframes neon-flow {
+  0% {
+    background-position: 100% 0;
+  }
+  100% {
+    background-position: 0% 0;
+  }
+}
+
 /* Custom animations for spinners */
 .animate-bounce-slow {
   animation: bounce-slow 15s infinite cubic-bezier(0.4, 0, 0.6, 1);

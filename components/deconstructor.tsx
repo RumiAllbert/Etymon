@@ -680,7 +680,9 @@ const InputNode = ({
         </span>
       </div>
       <form
-        className="px-6 py-4 rounded-xl dark:bg-gray-800/80 bg-white/80 dark:border-gray-700/50 border-gray-200/50 border shadow-xl flex gap-3"
+        className={`px-6 py-4 rounded-xl dark:bg-gray-800/80 bg-white/80 dark:border-gray-700/50 border-gray-200/50 border shadow-xl flex gap-3 ${
+          isLoading ? "loading-border active" : "loading-border"
+        }`}
         onSubmit={handleSubmit}
       >
         <input
