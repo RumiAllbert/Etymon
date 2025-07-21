@@ -199,7 +199,7 @@ Please fix all the issues and try again.`;
 
       try {
         const result = await generateObject({
-          model: google("gemini-2.5-flash-preview-04-17"),
+          model: google("gemini-2.5-flash"),
           system: `You are an expert etymology analysis system, specializing in Indo-European languages, particularly:
 - Ancient and Modern Greek
 - Latin and Romance languages (Spanish, French, Italian, Portuguese, Romanian)
