@@ -59,7 +59,7 @@ export default function WordFamilyPanel({ onWordClick }: WordFamilyPanelProps) {
       title="Word Family"
       icon={<Sparkles className="w-5 h-5 text-yellow-500" />}
       onClose={handleClose}
-      className="fixed left-4 top-20 w-96 max-h-[80vh] dark:bg-gray-800/95 bg-white/95 backdrop-blur-sm dark:border-gray-700/50 border-gray-200/50 border rounded-xl z-50 overflow-hidden flex flex-col"
+      className="fixed left-4 top-20 right-4 sm:right-auto w-auto sm:w-96 max-h-[80vh] dark:bg-gray-800/95 bg-white/95 backdrop-blur-sm dark:border-gray-700/50 border-gray-200/50 border rounded-xl z-50 overflow-hidden flex flex-col"
     >
       <div className="p-6 flex flex-col flex-1 min-h-0">
         {isFetching ? (

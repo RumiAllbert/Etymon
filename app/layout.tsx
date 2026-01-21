@@ -5,7 +5,7 @@ import QueryProvider from "@/components/providers/query-provider";
 import { ThemeProvider } from "@/components/theme-provider";
 import ThemeToggle from "@/components/theme-toggle";
 import { Toaster } from "@/components/ui/sonner";
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import PlausibleProvider from "next-plausible";
 import { Noto_Serif } from "next/font/google";
 import "./globals.css";
@@ -75,6 +75,13 @@ export const metadata: Metadata = {
     },
   },
   category: "education",
+};
+
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  maximumScale: 1,
+  userScalable: false,
 };
 
 export default function RootLayout({

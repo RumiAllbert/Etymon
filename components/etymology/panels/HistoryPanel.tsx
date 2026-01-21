@@ -67,7 +67,7 @@ export default function HistoryPanel({ onWordClick }: HistoryPanelProps) {
       title="Recent Searches"
       icon={<History className="w-5 h-5 text-gray-500" />}
       onClose={() => setShowHistory(false)}
-      className="fixed right-4 top-20 w-96 dark:bg-gray-800/95 bg-white/95 backdrop-blur-sm dark:border-gray-700/50 border-gray-200/50 border rounded-xl z-50 max-h-[80vh] flex flex-col"
+      className="fixed right-4 top-20 left-4 sm:left-auto w-auto sm:w-96 dark:bg-gray-800/95 bg-white/95 backdrop-blur-sm dark:border-gray-700/50 border-gray-200/50 border rounded-xl z-50 max-h-[80vh] flex flex-col"
     >
       {/* Action buttons */}
       <div className="flex items-center gap-2 px-4 py-2 border-b dark:border-gray-700/50 border-gray-200/50">

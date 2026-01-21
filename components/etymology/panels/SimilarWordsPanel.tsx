@@ -40,7 +40,7 @@ export default function SimilarWordsPanel({
       title="Similar Words"
       icon={<Layers className="w-5 h-5 text-blue-500" />}
       onClose={() => setShowSimilar(false)}
-      className={`fixed right-4 top-20 w-96 dark:bg-gray-800/95 bg-white/95 backdrop-blur-sm dark:border-gray-700/50 border-gray-200/50 border rounded-xl z-50 ${
+      className={`fixed right-4 top-20 left-4 sm:left-auto w-auto sm:w-96 dark:bg-gray-800/95 bg-white/95 backdrop-blur-sm dark:border-gray-700/50 border-gray-200/50 border rounded-xl z-50 ${
         isLoading ? "opacity-50" : ""
       }`}
     >

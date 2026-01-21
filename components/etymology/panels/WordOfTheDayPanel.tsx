@@ -47,7 +47,7 @@ export default function WordOfTheDayPanel({ onWordClick }: WordOfTheDayPanelProp
       title="Word of the Day"
       icon={<Sparkles className="w-5 h-5 text-yellow-500" />}
       onClose={() => setShowWotd(false)}
-      className="fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-[500px] max-h-[80vh] dark:bg-gray-800/95 bg-white/95 backdrop-blur-sm dark:border-gray-700/50 border-gray-200/50 border rounded-xl z-50 overflow-hidden flex flex-col"
+      className="fixed left-4 right-4 sm:left-1/2 sm:right-auto top-1/2 sm:-translate-x-1/2 -translate-y-1/2 w-auto sm:w-[500px] max-h-[80vh] dark:bg-gray-800/95 bg-white/95 backdrop-blur-sm dark:border-gray-700/50 border-gray-200/50 border rounded-xl z-50 overflow-hidden flex flex-col"
     >
       <div className="p-6 flex flex-col flex-1 min-h-0">
         {isLoading ? (

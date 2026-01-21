@@ -121,11 +121,11 @@ export default function InputNode({ data }: InputNodeProps) {
   }, [data.initialWord, setInputValue]);
 
   return (
-    <div className="flex flex-col items-center gap-4">
+    <div className="flex flex-col items-center gap-4 px-4 sm:px-0 w-full max-w-xl">
       <div className="flex items-center gap-2">
         <a
           href="/"
-          className="text-4xl font-serif dark:text-gray-100 text-gray-900 hover:opacity-80 transition-opacity"
+          className="text-2xl sm:text-4xl font-serif dark:text-gray-100 text-gray-900 hover:opacity-80 transition-opacity"
           title="Go to home page"
         >
           Etymon.ai
@@ -135,7 +135,7 @@ export default function InputNode({ data }: InputNodeProps) {
         </span>
       </div>
       <form
-        className={`px-6 py-4 rounded-xl dark:bg-gray-800/80 bg-white/80 dark:border-gray-700/50 border-gray-200/50 border shadow-xl flex gap-3 ${
+        className={`w-full px-4 sm:px-6 py-4 rounded-xl dark:bg-gray-800/80 bg-white/80 dark:border-gray-700/50 border-gray-200/50 border shadow-xl flex flex-col sm:flex-row gap-3 ${
           isLoading ? "loading-border active" : "loading-border"
         }`}
         onSubmit={handleSubmit}
@@ -172,7 +172,7 @@ export default function InputNode({ data }: InputNodeProps) {
           <button
             type="submit"
             disabled={isLoading}
-            className="w-[120px] px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-medium disabled:opacity-50 transition-colors flex items-center justify-center"
+            className="flex-1 sm:flex-none sm:w-[120px] px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-medium disabled:opacity-50 transition-colors flex items-center justify-center"
           >
             {isLoading ? <Spinner variant="random" /> : "Etymologize"}
           </button>

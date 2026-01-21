@@ -26,20 +26,14 @@ export default function DraggablePanel({
   const dragRef = useRef<{ startX: number; startY: number; initialX: number; initialY: number } | null>(null);
   const panelRef = useRef<HTMLDivElement>(null);
 
-  const handleMouseDown = useCallback((e: React.MouseEvent) => {
-    // Don't start drag if clicking on the close button
-    if ((e.target as HTMLElement).closest('button')) {
-      return;
-    }
-
-    e.preventDefault();
+  const startDrag = useCallback((clientX: number, clientY: number) => {
     setIsDragging(true);
 
     const rect = panelRef.current?.getBoundingClientRect();
     if (rect) {
       dragRef.current = {
-        startX: e.clientX,
-        startY: e.clientY,
+        startX: clientX,
+        startY: clientY,
         initialX: rect.left,
         initialY: rect.top,
       };
@@ -50,11 +44,31 @@ export default function DraggablePanel({
     }
   }, [hasBeenDragged]);
 
-  const handleMouseMove = useCallback((e: MouseEvent) => {
-    if (!isDragging || !dragRef.current) return;
+  const handleMouseDown = useCallback((e: React.MouseEvent) => {
+    // Don't start drag if clicking on the close button
+    if ((e.target as HTMLElement).closest('button')) {
+      return;
+    }
 
-    const deltaX = e.clientX - dragRef.current.startX;
-    const deltaY = e.clientY - dragRef.current.startY;
+    e.preventDefault();
+    startDrag(e.clientX, e.clientY);
+  }, [startDrag]);
+
+  const handleTouchStart = useCallback((e: React.TouchEvent) => {
+    // Don't start drag if touching the close button
+    if ((e.target as HTMLElement).closest('button')) {
+      return;
+    }
+
+    const touch = e.touches[0];
+    startDrag(touch.clientX, touch.clientY);
+  }, [startDrag]);
+
+  const updatePosition = useCallback((clientX: number, clientY: number) => {
+    if (!dragRef.current) return;
+
+    const deltaX = clientX - dragRef.current.startX;
+    const deltaY = clientY - dragRef.current.startY;
 
     let newX = dragRef.current.initialX + deltaX;
     let newY = dragRef.current.initialY + deltaY;
@@ -67,9 +81,20 @@ export default function DraggablePanel({
     newY = Math.max(0, Math.min(newY, window.innerHeight - panelHeight));
 
     setPosition({ x: newX, y: newY });
-  }, [isDragging]);
+  }, []);
 
-  const handleMouseUp = useCallback(() => {
+  const handleMouseMove = useCallback((e: MouseEvent) => {
+    if (!isDragging) return;
+    updatePosition(e.clientX, e.clientY);
+  }, [isDragging, updatePosition]);
+
+  const handleTouchMove = useCallback((e: TouchEvent) => {
+    if (!isDragging) return;
+    const touch = e.touches[0];
+    updatePosition(touch.clientX, touch.clientY);
+  }, [isDragging, updatePosition]);
+
+  const handleDragEnd = useCallback(() => {
     setIsDragging(false);
     dragRef.current = null;
   }, []);
@@ -77,18 +102,24 @@ export default function DraggablePanel({
   useEffect(() => {
     if (isDragging) {
       window.addEventListener("mousemove", handleMouseMove);
-      window.addEventListener("mouseup", handleMouseUp);
+      window.addEventListener("mouseup", handleDragEnd);
+      window.addEventListener("touchmove", handleTouchMove, { passive: false });
+      window.addEventListener("touchend", handleDragEnd);
+      window.addEventListener("touchcancel", handleDragEnd);
       document.body.style.cursor = "grabbing";
       document.body.style.userSelect = "none";
     }
 
     return () => {
       window.removeEventListener("mousemove", handleMouseMove);
-      window.removeEventListener("mouseup", handleMouseUp);
+      window.removeEventListener("mouseup", handleDragEnd);
+      window.removeEventListener("touchmove", handleTouchMove);
+      window.removeEventListener("touchend", handleDragEnd);
+      window.removeEventListener("touchcancel", handleDragEnd);
       document.body.style.cursor = "";
       document.body.style.userSelect = "";
     };
-  }, [isDragging, handleMouseMove, handleMouseUp]);
+  }, [isDragging, handleMouseMove, handleTouchMove, handleDragEnd]);
 
   // Dynamic positioning styles
   const positionStyles = hasBeenDragged
@@ -114,6 +145,7 @@ export default function DraggablePanel({
       <div
         data-drag-handle
         onMouseDown={handleMouseDown}
+        onTouchStart={handleTouchStart}
         className={`
           flex items-center justify-between
           px-4 py-3
