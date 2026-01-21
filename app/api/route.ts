@@ -22,7 +22,7 @@ function validateWordParts(word: string, parts: WordOutput["parts"]): string[] {
   // More flexible validation for words that might be returned in Greek
   // We'll check if the combined parts contain non-Latin characters
   const hasNonLatinChars = /[^\u0000-\u007F]/.test(combinedParts);
-  
+
   if (hasNonLatinChars) {
     // For words with non-Latin characters (like Greek), we'll skip the strict validation
     // as the model might return the original Greek form of an English word
@@ -53,8 +53,7 @@ function validateUniqueIds(output: WordOutput): string[] {
     layer.forEach((combo) => {
       if (seenIds.has(combo.id)) {
         errors.push(
-          `ID "${combo.id}" in combinations layer ${
-            layerIndex + 1
+          `ID "${combo.id}" in combinations layer ${layerIndex + 1
           } is already used in ${seenIds.get(
             combo.id
           )}. IDs must be unique across both parts and combinations.`
@@ -82,7 +81,7 @@ function validateCombinations(word: string, output: WordOutput): string[] {
   if (lastLayer?.length === 1) {
     const finalWord = lastLayer[0].text.toLowerCase();
     const hasNonLatinChars = /[^\u0000-\u007F]/.test(finalWord);
-    
+
     // For words with non-Latin characters, we'll use a more flexible validation
     if (hasNonLatinChars) {
       // For Greek words, we'll just check if the thought field mentions the search word
@@ -183,15 +182,15 @@ export async function POST(req: Request) {
 
 Previous attempts:
 ${attempts
-  .map(
-    (attempt, index) => `
+            .map(
+              (attempt, index) => `
 Attempt ${index + 1}:
 ${JSON.stringify(attempt.output, null, 2)}
 Errors:
 ${attempt.errors.map((error) => `- ${error}`).join("\n")}
 `
-  )
-  .join("\n")}
+            )
+            .join("\n")}
 
 Please fix all the issues and try again.`;
 
