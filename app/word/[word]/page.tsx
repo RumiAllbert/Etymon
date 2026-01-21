@@ -1,4 +1,4 @@
-import WordDeconstructor from "@/components/deconstructor";
+import WordDeconstructor from "@/components/etymology";
 import StructuredData from "@/components/structured-data";
 import { Metadata, ResolvingMetadata } from "next";
 

@@ -1,5 +1,7 @@
 import GoogleAnalytics from "@/components/google-analytics";
 import Outbound from "@/components/outbound";
+import AuthProvider from "@/components/providers/auth-provider";
+import QueryProvider from "@/components/providers/query-provider";
 import { ThemeProvider } from "@/components/theme-provider";
 import ThemeToggle from "@/components/theme-toggle";
 import { Toaster } from "@/components/ui/sonner";
@@ -99,23 +101,27 @@ export default function RootLayout({
         <meta name="format-detection" content="address=no" />
       </head>
       <body className={notoSerif.className} suppressHydrationWarning>
-        <ThemeProvider
-          attribute="class"
-          defaultTheme="dark"
-          enableSystem
-          disableTransitionOnChange
-        >
-          <PlausibleProvider domain="etymon.rumiallbert.com">
-            <div className="flex justify-between items-center absolute top-5 left-5 z-50 gap-4">
-              <Outbound />
-            </div>
-            <div className="absolute top-5 right-5 z-50">
-              <ThemeToggle />
-            </div>
-            {children}
-            <Toaster />
-          </PlausibleProvider>
-        </ThemeProvider>
+        <AuthProvider>
+          <QueryProvider>
+            <ThemeProvider
+              attribute="class"
+              defaultTheme="dark"
+              enableSystem
+              disableTransitionOnChange
+            >
+              <PlausibleProvider domain="etymon.rumiallbert.com">
+                <div className="flex justify-between items-center absolute top-5 left-5 z-50 gap-4">
+                  <Outbound />
+                </div>
+                <div className="absolute top-5 right-5 z-50">
+                  <ThemeToggle />
+                </div>
+                {children}
+                <Toaster />
+              </PlausibleProvider>
+            </ThemeProvider>
+          </QueryProvider>
+        </AuthProvider>
       </body>
     </html>
   );

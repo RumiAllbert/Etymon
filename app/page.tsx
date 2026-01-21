@@ -1,6 +1,6 @@
 "use client";
 
-import WordDeconstructor from "@/components/deconstructor";
+import WordDeconstructor from "@/components/etymology";
 
 export default function Home() {
   return (
