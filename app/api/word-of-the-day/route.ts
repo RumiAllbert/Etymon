@@ -2,6 +2,8 @@ import { wordSchema } from "@/utils/schema";
 import { google } from "@ai-sdk/google";
 import { generateObject } from "ai";
 import { z } from "zod";
+import { getMemoryCache, setMemoryCache } from "@/lib/server-cache";
+import { getDbCache, setDbCache } from "@/lib/db-cache";
 
 export const maxDuration = 30;
 
@@ -11,6 +13,10 @@ const wordOfTheDayResponseSchema = z.object({
   funFact: z.string(),
   usageExample: z.string(),
 });
+
+type WordOfTheDayResponse = z.infer<typeof wordOfTheDayResponseSchema> & {
+  featuredDate: string;
+};
 
 const systemPrompt = `You are an expert etymologist curating fascinating words for Word of the Day.
 
@@ -34,9 +40,30 @@ Example words with great etymologies:
 
 export async function GET() {
   try {
-    // Use the current date as a seed for consistent daily word
+    // Use the current date as the cache key
     const today = new Date().toISOString().split("T")[0];
+    const cacheParams = { date: today };
 
+    // 1. Check server memory cache
+    const memoryCached = getMemoryCache<WordOfTheDayResponse>(
+      "word_of_the_day",
+      cacheParams
+    );
+    if (memoryCached) {
+      return Response.json(memoryCached);
+    }
+
+    // 2. Check database cache
+    const dbCached = await getDbCache<WordOfTheDayResponse>(
+      "word_of_the_day",
+      cacheParams
+    );
+    if (dbCached) {
+      // Memory cache was already populated by getDbCache
+      return Response.json(dbCached);
+    }
+
+    // 3. Cache miss - call Gemini API
     const { object } = await generateObject({
       model: google("gemini-3-flash-preview"),
       schema: wordOfTheDayResponseSchema,
@@ -56,10 +83,20 @@ Choose an interesting English word with a fascinating etymology. Provide:
 Make sure the word has a genuinely interesting history that will educate and delight readers.`,
     });
 
-    return Response.json({
+    const result: WordOfTheDayResponse = {
       ...object,
       featuredDate: today,
+    };
+
+    // 4. Store in memory cache
+    setMemoryCache("word_of_the_day", cacheParams, result);
+
+    // 5. Store in database cache (async, don't await)
+    setDbCache("word_of_the_day", cacheParams, result).catch((err) => {
+      console.error("[Cache] Failed to store WOTD in DB:", err);
     });
+
+    return Response.json(result);
   } catch (error) {
     console.error("Word of the day error:", error);
     return Response.json(

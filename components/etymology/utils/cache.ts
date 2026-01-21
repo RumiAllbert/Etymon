@@ -1,5 +1,5 @@
 import { wordSchema, type Definition } from "@/utils/schema";
-import { CACHE_PREFIX, CACHE_EXPIRY } from "./constants";
+import { CACHE_PREFIX, CACHE_EXPIRY, CLIENT_CACHE_CONFIG, type ClientCacheType } from "./constants";
 import {
   normalizeWord,
   isWordMismatch,
@@ -308,5 +308,159 @@ export function clearOldCache(): void {
     });
   } catch {
     // Ignore
+  }
+}
+
+// =============================================================================
+// Generic Client Cache Utilities (for all cache types)
+// =============================================================================
+
+interface GenericCacheEntry<T> {
+  data: T;
+  timestamp: number;
+  key: string;
+}
+
+/**
+ * Get a generic cache entry by type and key
+ */
+export function getClientCache<T>(
+  cacheType: ClientCacheType,
+  key: string
+): T | null {
+  if (typeof window === "undefined") return null;
+
+  const config = CLIENT_CACHE_CONFIG[cacheType];
+  const cacheKey = config.prefix + key.toLowerCase().trim();
+
+  try {
+    const cached = localStorage.getItem(cacheKey);
+    if (!cached) return null;
+
+    const parsed: GenericCacheEntry<T> = JSON.parse(cached);
+
+    // Check expiry
+    if (Date.now() - parsed.timestamp > config.ttl) {
+      localStorage.removeItem(cacheKey);
+      return null;
+    }
+
+    return parsed.data;
+  } catch {
+    // Remove corrupted entry
+    try {
+      localStorage.removeItem(cacheKey);
+    } catch {
+      // Ignore
+    }
+    return null;
+  }
+}
+
+/**
+ * Set a generic cache entry by type and key
+ */
+export function setClientCache<T>(
+  cacheType: ClientCacheType,
+  key: string,
+  data: T
+): void {
+  if (typeof window === "undefined") return;
+
+  const config = CLIENT_CACHE_CONFIG[cacheType];
+  const cacheKey = config.prefix + key.toLowerCase().trim();
+
+  try {
+    const entry: GenericCacheEntry<T> = {
+      data,
+      timestamp: Date.now(),
+      key,
+    };
+
+    localStorage.setItem(cacheKey, JSON.stringify(entry));
+  } catch {
+    // Might be quota exceeded, try clearing old entries
+    try {
+      clearExpiredClientCache(cacheType);
+      const entry: GenericCacheEntry<T> = {
+        data,
+        timestamp: Date.now(),
+        key,
+      };
+      localStorage.setItem(cacheKey, JSON.stringify(entry));
+    } catch {
+      // Ignore
+    }
+  }
+}
+
+/**
+ * Clear expired entries for a specific cache type
+ */
+export function clearExpiredClientCache(cacheType: ClientCacheType): void {
+  if (typeof window === "undefined") return;
+
+  const config = CLIENT_CACHE_CONFIG[cacheType];
+  const now = Date.now();
+  const keysToRemove: string[] = [];
+
+  try {
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i);
+      if (key && key.startsWith(config.prefix)) {
+        try {
+          const cached = localStorage.getItem(key);
+          if (cached) {
+            const { timestamp } = JSON.parse(cached);
+            if (now - timestamp > config.ttl) {
+              keysToRemove.push(key);
+            }
+          }
+        } catch {
+          keysToRemove.push(key);
+        }
+      }
+    }
+
+    keysToRemove.forEach((key) => {
+      try {
+        localStorage.removeItem(key);
+      } catch {
+        // Ignore
+      }
+    });
+  } catch {
+    // Ignore
+  }
+}
+
+/**
+ * Clear all entries for a specific cache type
+ */
+export function clearClientCache(cacheType: ClientCacheType): number {
+  if (typeof window === "undefined") return 0;
+
+  const config = CLIENT_CACHE_CONFIG[cacheType];
+  const keysToRemove: string[] = [];
+
+  try {
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i);
+      if (key && key.startsWith(config.prefix)) {
+        keysToRemove.push(key);
+      }
+    }
+
+    keysToRemove.forEach((key) => {
+      try {
+        localStorage.removeItem(key);
+      } catch {
+        // Ignore
+      }
+    });
+
+    return keysToRemove.length;
+  } catch {
+    return 0;
   }
 }

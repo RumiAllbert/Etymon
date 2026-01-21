@@ -112,7 +112,7 @@ export default function ExplorePage() {
     queryKey: ["morpheme", selectedMorpheme],
     queryFn: () => fetchMorpheme(selectedMorpheme!),
     enabled: !!selectedMorpheme,
-    staleTime: 5 * 60 * 1000,
+    staleTime: 30 * 60 * 1000, // 30 minutes
   });
 
   const handleSearch = (e: React.FormEvent) => {

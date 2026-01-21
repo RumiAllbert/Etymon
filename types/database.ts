@@ -235,6 +235,35 @@ export interface Database {
           updated_at?: string;
         };
       };
+      etymology_cache: {
+        Row: {
+          id: string;
+          cache_type: string;
+          cache_key: string;
+          data: Json;
+          created_at: string;
+          expires_at: string;
+          hit_count: number;
+        };
+        Insert: {
+          id?: string;
+          cache_type: string;
+          cache_key: string;
+          data: Json;
+          created_at?: string;
+          expires_at: string;
+          hit_count?: number;
+        };
+        Update: {
+          id?: string;
+          cache_type?: string;
+          cache_key?: string;
+          data?: Json;
+          created_at?: string;
+          expires_at?: string;
+          hit_count?: number;
+        };
+      };
     };
     Views: {
       [_ in never]: never;

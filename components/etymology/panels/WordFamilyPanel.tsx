@@ -37,7 +37,7 @@ export default function WordFamilyPanel({ onWordClick }: WordFamilyPanelProps) {
     queryKey: ["wordFamily", currentRoot],
     queryFn: () => fetchWordFamily(currentRoot!),
     enabled: !!currentRoot && showWordFamily,
-    staleTime: 5 * 60 * 1000,
+    staleTime: 30 * 60 * 1000, // 30 minutes
   });
 
   const handleWordClick = async (word: string) => {

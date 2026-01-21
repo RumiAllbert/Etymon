@@ -61,7 +61,7 @@ export default function CognatesPanel({ word }: CognatesPanelProps) {
     queryKey: ["cognates", activeWord],
     queryFn: () => fetchCognates(activeWord!),
     enabled: !!activeWord && showCognates,
-    staleTime: 5 * 60 * 1000,
+    staleTime: 15 * 60 * 1000, // 15 minutes
   });
 
   const handleClose = () => {

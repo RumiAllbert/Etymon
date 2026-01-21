@@ -1,9 +1,11 @@
 import { generateObject } from "ai";
 // import { createOpenRouter } from "@openrouter/ai-sdk-provider";
-import { wordSchema } from "@/utils/schema";
+import { wordSchema, type Definition } from "@/utils/schema";
 import { google } from "@ai-sdk/google";
 import { NextResponse } from "next/server";
 import { z } from "zod";
+import { getMemoryCache, setMemoryCache } from "@/lib/server-cache";
+import { getDbCache, setDbCache } from "@/lib/db-cache";
 // const openrouter = createOpenRouter({
 //   apiKey: process.env.OPENROUTER_API_KEY,
 // });
@@ -171,6 +173,22 @@ export async function POST(req: Request) {
       );
     }
 
+    const cacheParams = { word: word.toLowerCase() };
+
+    // 1. Check server memory cache
+    const memoryCached = getMemoryCache<Definition>("etymology", cacheParams);
+    if (memoryCached) {
+      return NextResponse.json(memoryCached);
+    }
+
+    // 2. Check database cache
+    const dbCached = await getDbCache<Definition>("etymology", cacheParams);
+    if (dbCached) {
+      // Memory cache was already populated by getDbCache
+      return NextResponse.json(dbCached);
+    }
+
+    // 3. Cache miss - proceed with Gemini API call
     const attempts: LastAttempt[] = [];
     const maxAttempts = 3;
 
@@ -389,6 +407,14 @@ Guidelines:
           });
           continue;
         }
+
+        // 4. Store successful, validated response in memory cache
+        setMemoryCache("etymology", cacheParams, result.object);
+
+        // 5. Store in database cache (async, don't await)
+        setDbCache("etymology", cacheParams, result.object).catch((err) => {
+          console.error("[Cache] Failed to store etymology in DB:", err);
+        });
 
         return NextResponse.json(result.object);
       } catch (error) {

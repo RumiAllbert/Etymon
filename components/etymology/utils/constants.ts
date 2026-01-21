@@ -7,6 +7,36 @@ export const CACHE_EXPIRY = 60 * 60 * 1000; // 60 minutes in milliseconds
 export const HISTORY_KEY = "etymon_search_history";
 export const MAX_HISTORY_ITEMS = 10;
 
+// Client-side cache configuration for different data types
+export const CLIENT_CACHE_CONFIG = {
+  etymology: {
+    prefix: "etymon_cache_",
+    ttl: 60 * 60 * 1000, // 60 minutes
+  },
+  wordOfTheDay: {
+    prefix: "etymon_wotd_",
+    ttl: 24 * 60 * 60 * 1000, // 24 hours
+  },
+  wordFamily: {
+    prefix: "etymon_family_",
+    ttl: 30 * 60 * 1000, // 30 minutes
+  },
+  morpheme: {
+    prefix: "etymon_morpheme_",
+    ttl: 30 * 60 * 1000, // 30 minutes
+  },
+  cognates: {
+    prefix: "etymon_cognates_",
+    ttl: 15 * 60 * 1000, // 15 minutes
+  },
+  timeline: {
+    prefix: "etymon_timeline_",
+    ttl: 15 * 60 * 1000, // 15 minutes
+  },
+} as const;
+
+export type ClientCacheType = keyof typeof CLIENT_CACHE_CONFIG;
+
 // Layout constants
 export const WORD_CHUNK_PADDING = 3;
 export const ORIGIN_PADDING = 10;

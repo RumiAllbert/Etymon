@@ -1,6 +1,8 @@
-import { cognatesResponseSchema } from "@/utils/schema";
+import { cognatesResponseSchema, type CognatesResponse } from "@/utils/schema";
 import { google } from "@ai-sdk/google";
 import { generateObject } from "ai";
+import { getMemoryCache, setMemoryCache } from "@/lib/server-cache";
+import { getDbCache, setDbCache } from "@/lib/db-cache";
 
 export const maxDuration = 30;
 
@@ -44,6 +46,22 @@ export async function POST(req: Request) {
       return Response.json({ error: "Word is required" }, { status: 400 });
     }
 
+    const cacheParams = { word: word.toLowerCase(), lang: sourceLanguage.toLowerCase() };
+
+    // 1. Check server memory cache
+    const memoryCached = getMemoryCache<CognatesResponse>("cognates", cacheParams);
+    if (memoryCached) {
+      return Response.json(memoryCached);
+    }
+
+    // 2. Check database cache
+    const dbCached = await getDbCache<CognatesResponse>("cognates", cacheParams);
+    if (dbCached) {
+      // Memory cache was already populated by getDbCache
+      return Response.json(dbCached);
+    }
+
+    // 3. Cache miss - call Gemini API
     const { object } = await generateObject({
       model: google("gemini-3-flash-preview"),
       schema: cognatesResponseSchema,
@@ -58,6 +76,14 @@ Provide:
 5. A brief description of the language family tree
 
 Focus on accurate linguistic relationships. Only include true cognates (words descended from a common ancestor), not borrowings.`,
+    });
+
+    // 4. Store in memory cache
+    setMemoryCache("cognates", cacheParams, object);
+
+    // 5. Store in database cache (async, don't await)
+    setDbCache("cognates", cacheParams, object).catch((err) => {
+      console.error("[Cache] Failed to store cognates in DB:", err);
     });
 
     return Response.json(object);

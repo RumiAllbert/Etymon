@@ -37,7 +37,7 @@ export default function TimelinePanel({ word }: TimelinePanelProps) {
     queryKey: ["timeline", activeWord],
     queryFn: () => fetchTimeline(activeWord!),
     enabled: !!activeWord && showTimeline,
-    staleTime: 5 * 60 * 1000,
+    staleTime: 15 * 60 * 1000, // 15 minutes
   });
 
   const handleClose = () => {

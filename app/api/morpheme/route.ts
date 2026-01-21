@@ -1,6 +1,8 @@
-import { morphemeSchema } from "@/utils/schema";
+import { morphemeSchema, type Morpheme } from "@/utils/schema";
 import { google } from "@ai-sdk/google";
 import { generateObject } from "ai";
+import { getMemoryCache, setMemoryCache } from "@/lib/server-cache";
+import { getDbCache, setDbCache } from "@/lib/db-cache";
 
 export const maxDuration = 30;
 
@@ -35,6 +37,22 @@ export async function POST(req: Request) {
       return Response.json({ error: "Morpheme is required" }, { status: 400 });
     }
 
+    const cacheParams = { morpheme: morpheme.toLowerCase() };
+
+    // 1. Check server memory cache
+    const memoryCached = getMemoryCache<Morpheme>("morpheme", cacheParams);
+    if (memoryCached) {
+      return Response.json(memoryCached);
+    }
+
+    // 2. Check database cache
+    const dbCached = await getDbCache<Morpheme>("morpheme", cacheParams);
+    if (dbCached) {
+      // Memory cache was already populated by getDbCache
+      return Response.json(dbCached);
+    }
+
+    // 3. Cache miss - call Gemini API
     const { object } = await generateObject({
       model: google("gemini-3-flash-preview"),
       schema: morphemeSchema,
@@ -49,6 +67,14 @@ Provide:
 5. Related morphemes with similar meanings or functions
 
 Be thorough and accurate. Focus on how this morpheme is used in modern English.`,
+    });
+
+    // 4. Store in memory cache
+    setMemoryCache("morpheme", cacheParams, object);
+
+    // 5. Store in database cache (async, don't await)
+    setDbCache("morpheme", cacheParams, object).catch((err) => {
+      console.error("[Cache] Failed to store morpheme in DB:", err);
     });
 
     return Response.json(object);

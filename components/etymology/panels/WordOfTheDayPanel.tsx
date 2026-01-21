@@ -30,7 +30,7 @@ export default function WordOfTheDayPanel({ onWordClick }: WordOfTheDayPanelProp
     queryKey: ["wordOfTheDay"],
     queryFn: fetchWordOfTheDay,
     enabled: showWotd,
-    staleTime: 60 * 60 * 1000, // 1 hour
+    staleTime: 24 * 60 * 60 * 1000, // 24 hours - word of the day should be stable all day
   });
 
   const handleWordClick = async () => {
